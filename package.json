@@ -21,7 +21,8 @@
     "react-native-fs": "^2.20.0",
     "react-native-intent-launcher": "^0.2.1",
     "react-native-live-audio-stream": "^1.1.1",
-    "react-native-safe-area-context": "^5.5.2"
+    "react-native-safe-area-context": "^5.5.2",
+    "whatwg-fetch": "^3.6.20"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
