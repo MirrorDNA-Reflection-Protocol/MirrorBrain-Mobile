@@ -7,7 +7,6 @@ export { IdentityService } from './identity.service';
 export { LLMService, AVAILABLE_MODELS, type ModelId } from './llm.service';
 export { CalendarService, type CalendarEvent } from './calendar.service';
 export { VoiceService } from './voice.service';
-export { KiwixService } from './kiwix.service';
 export { SyncService, type SyncPackage } from './sync.service';
 export { DeviceService } from './device.service';
 export { AppLauncherService, type InstalledApp } from './applauncher.service';

@@ -30,7 +30,7 @@ interface UseLLMResult {
     downloadModel: (
         modelId: ModelId,
         onProgress?: (progress: number) => void
-    ) => Promise<{ success: boolean; error?: string }>;
+    ) => Promise<boolean>;
 
     // Model info
     availableModels: typeof AVAILABLE_MODELS;
@@ -96,7 +96,7 @@ export function useLLM(): UseLLMResult {
     const downloadModel = useCallback(async (
         modelId: ModelId,
         onProgress?: (progress: number) => void
-    ): Promise<{ success: boolean; error?: string }> => {
+    ): Promise<boolean> => {
         setIsLoading(true);
         try {
             return await LLMService.downloadModel(modelId, onProgress);

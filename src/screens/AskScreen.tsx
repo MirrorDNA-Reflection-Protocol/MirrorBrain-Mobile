@@ -19,12 +19,10 @@ import {
     Modal,
     ActivityIndicator,
     Keyboard,
-    Alert,
-    PermissionsAndroid,
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
 import { useLLM } from '../hooks';
-import { VaultService, IdentityService, VoiceService } from '../services';
+import { VaultService, IdentityService } from '../services';
 import type { AskMode, ChatMessage, SessionClosure } from '../types';
 
 // System prompt for MirrorMesh
@@ -51,8 +49,6 @@ export const AskScreen: React.FC<AskScreenProps> = ({
     const [streamingText, setStreamingText] = useState('');
     const [showModelModal, setShowModelModal] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
-    const [isRecording, setIsRecording] = useState(false);
-    const [isProcessingVoice, setIsProcessingVoice] = useState(false);
     const scrollViewRef = useRef<ScrollView>(null);
 
     const {
@@ -73,34 +69,12 @@ export const AskScreen: React.FC<AskScreenProps> = ({
     }, []);
 
     const checkInitialModel = async () => {
-        if (availableModels.length === 0) return;
-
-        const firstModelId = availableModels[0].id;
-        const exists = await checkModelExists(firstModelId);
-
-        if (exists && !isModelLoaded) {
-            await loadModel(firstModelId);
-        } else if (!exists) {
+        const hasQwen = await checkModelExists('qwen-2.5-1.5b');
+        if (hasQwen && !isModelLoaded) {
+            await loadModel('qwen-2.5-1.5b');
+        } else if (!hasQwen) {
+            // Show model download modal on first use
             setShowModelModal(true);
-        }
-    };
-
-    // Auto-save session periodically or on change
-    useEffect(() => {
-        if (messages.length > 0 && messages.length % 5 === 0) {
-            saveDraft();
-        }
-    }, [messages.length]);
-
-    const saveDraft = async () => {
-        if (messages.length === 0) return;
-        try {
-            await VaultService.saveSession(messages, {
-                type: 'pause',
-                note: 'Auto-saved'
-            });
-        } catch (error) {
-            console.log('Auto-save failed:', error);
         }
     };
 
@@ -115,41 +89,8 @@ export const AskScreen: React.FC<AskScreenProps> = ({
         }
     };
 
-    const handleVoicePress = async () => {
-        if (isRecording) {
-            // Stop
-            setIsRecording(false);
-            setIsProcessingVoice(true);
-            const text = await VoiceService.stopAndTranscribe();
-            setIsProcessingVoice(false);
-
-            if (text) {
-                // If it looks like a command, execute it? For now just put in input
-                const currentInput = input;
-                setInput(currentInput ? currentInput + ' ' + text : text);
-            }
-        } else {
-            // Start
-            // Check if model exists first
-            const hasModel = await VoiceService.isModelAvailable();
-            if (!hasModel) {
-                alert('Downloading Whisper model...');
-                const success = await VoiceService.downloadModel();
-                if (!success) {
-                    alert('Failed to download Voice model');
-                    return;
-                }
-            }
-
-            const started = await VoiceService.startRecording();
-            if (started) {
-                setIsRecording(true);
-            }
-        }
-    };
-
     const handleSend = async () => {
-        if (!input.trim() && !isRecording) return;
+        if (!input.trim()) return;
 
         const userMessage: ChatMessage = {
             role: 'user',
@@ -161,10 +102,6 @@ export const AskScreen: React.FC<AskScreenProps> = ({
         setMessages(newMessages);
         setInput('');
         setStreamingText('');
-
-        // Auto-save user message
-        VaultService.saveSession(newMessages, { type: 'pause', note: 'Auto-saved' })
-            .catch(err => console.log('Auto-save err:', err));
 
         if (mode === 'MirrorMesh') {
             if (!isModelLoaded) {
@@ -236,42 +173,18 @@ export const AskScreen: React.FC<AskScreenProps> = ({
         setStreamingText('');
     };
 
-    const handleDownloadModel = async (modelId: string) => {
-        // Request storage permissions on Android (older versions needed this, new ones strict but worth a try)
-        if (Platform.OS === 'android') {
-            try {
-                await PermissionsAndroid.requestMultiple([
-                    PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-                    PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-                ]);
-            } catch (err) {
-                console.warn(err);
-            }
-        }
-
+    const handleDownloadModel = async (modelId: 'qwen-2.5-1.5b' | 'smollm2-360m') => {
         setDownloadProgress(0);
 
-        try {
-            const result = await downloadModel(modelId as any, (progress) => {
-                setDownloadProgress(progress);
-            });
+        const success = await downloadModel(modelId, (progress) => {
+            setDownloadProgress(progress);
+        });
 
-            setDownloadProgress(null);
+        setDownloadProgress(null);
 
-            if (result.success) {
-                console.log('Download successful, loading model...');
-                await loadModel(modelId as any);
-                setShowModelModal(false);
-                Alert.alert('Success', 'Model downloaded and loaded.');
-            } else {
-                console.error('Download failed:', result.error);
-                const errorMessage = result.error || 'Check internet connection and storage.';
-                Alert.alert('Download Failed', `Step failed: ${errorMessage}`);
-            }
-        } catch (error: any) {
-            setDownloadProgress(null);
-            console.error('Unexpected download error:', error);
-            Alert.alert('Error', `An unexpected error occurred: ${error.message}`);
+        if (success) {
+            await loadModel(modelId);
+            setShowModelModal(false);
         }
     };
 
@@ -280,8 +193,8 @@ export const AskScreen: React.FC<AskScreenProps> = ({
     return (
         <KeyboardAvoidingView
             style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+            behavior="padding"
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 60}
         >
             {/* Online banner */}
             {isOnline && (
@@ -299,7 +212,7 @@ export const AskScreen: React.FC<AskScreenProps> = ({
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
                     <Text style={styles.glyph}>{glyphs.synthesis}</Text>
-                    <Text style={styles.title}>ASK (v2)</Text>
+                    <Text style={styles.title}>ASK</Text>
                 </View>
                 <TouchableOpacity
                     style={styles.modelButton}
@@ -427,32 +340,13 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                     returnKeyType="send"
                     onSubmitEditing={handleSend}
                 />
-
-                <TouchableOpacity
-                    style={[
-                        styles.voiceButton,
-                        isRecording && styles.voiceButtonRecording,
-                        isProcessingVoice && styles.voiceButtonProcessing
-                    ]}
-                    onPress={handleVoicePress}
-                    disabled={isProcessingVoice}
-                >
-                    {isProcessingVoice ? (
-                        <ActivityIndicator color={colors.textPrimary} size="small" />
-                    ) : (
-                        <Text style={styles.voiceButtonText}>
-                            {isRecording ? '🟥' : '🎤'}
-                        </Text>
-                    )}
-                </TouchableOpacity>
-
                 <TouchableOpacity
                     style={[
                         styles.sendButton,
-                        (!input.trim() && !isRecording) && styles.sendButtonDisabled
+                        (!input.trim() || isGenerating) && styles.sendButtonDisabled
                     ]}
                     onPress={handleSend}
-                    disabled={(!input.trim() && !isRecording) || isGenerating}
+                    disabled={!input.trim() || isGenerating}
                 >
                     {isGenerating ? (
                         <ActivityIndicator size="small" color={colors.textPrimary} />
@@ -492,20 +386,18 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                                     <Text style={styles.modelSize}>{model.size}</Text>
                                     <Text style={styles.modelDesc}>{model.description}</Text>
                                 </View>
-                                <View style={styles.modelActions}>
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.downloadButton,
-                                            loadedModel === model.id && styles.downloadButtonLoaded,
-                                        ]}
-                                        onPress={() => handleDownloadModel(model.id)}
-                                        disabled={isLoading}
-                                    >
-                                        <Text style={styles.downloadButtonText}>
-                                            {loadedModel === model.id ? 'Re-download' : 'Download'}
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.downloadButton,
+                                        loadedModel === model.id && styles.downloadButtonLoaded,
+                                    ]}
+                                    onPress={() => handleDownloadModel(model.id as 'qwen-2.5-1.5b' | 'smollm2-360m')}
+                                    disabled={isLoading || loadedModel === model.id}
+                                >
+                                    <Text style={styles.downloadButtonText}>
+                                        {loadedModel === model.id ? '✓ Loaded' : 'Download'}
+                                    </Text>
+                                </TouchableOpacity>
                             </View>
                         ))}
 
@@ -624,11 +516,6 @@ const styles = StyleSheet.create({
     },
     modelButton: {
         padding: spacing.sm,
-    },
-    modelActions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
     },
     modelButtonText: {
         fontSize: 20,
@@ -804,28 +691,6 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 4,
-    },
-    voiceButton: {
-        marginLeft: spacing.sm,
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: colors.surface,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-    voiceButtonRecording: {
-        backgroundColor: colors.statusError,
-        borderColor: colors.statusError,
-    },
-    voiceButtonProcessing: {
-        opacity: 0.5,
-    },
-    voiceButtonText: {
-        fontSize: 20,
-        color: colors.textPrimary,
     },
     sendButtonDisabled: {
         backgroundColor: colors.surface,

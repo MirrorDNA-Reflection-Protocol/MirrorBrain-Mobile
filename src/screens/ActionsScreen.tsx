@@ -20,7 +20,7 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
-import { VaultService, CalendarService, VoiceService, KiwixService, SyncthingService, type CalendarEvent } from '../services';
+import { VaultService, CalendarService, VoiceService, type CalendarEvent } from '../services';
 
 interface Action {
     id: string;
@@ -73,20 +73,6 @@ const actions: Action[] = [
         description: 'Receive shares from other apps',
         available: false, // Phase 4
     },
-    {
-        id: 'kiwix',
-        icon: '📚',
-        label: 'Offline Knowledge',
-        description: 'Launch Kiwix (Wikipedia/ZIM)',
-        available: true,
-    },
-    {
-        id: 'tailscale',
-        icon: '🔗',
-        label: 'Tailscale / Sync',
-        description: 'VPN & Server Sync',
-        available: true,
-    },
 ];
 
 interface ActionsScreenProps {
@@ -108,26 +94,6 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
     // Voice state
     const [isRecording, setIsRecording] = useState(false);
     const [recordingDuration, setRecordingDuration] = useState(0);
-
-    // Sync state
-    const [syncModalVisible, setSyncModalVisible] = useState(false);
-    const [serverIp, setServerIp] = useState('');
-    const [syncStatus, setSyncStatus] = useState<string>('Checking...');
-    const [isSyncing, setIsSyncing] = useState(false);
-
-    // Initial sync check
-    useEffect(() => {
-        SyncthingService.initialize()
-            .then(() => {
-                SyncthingService.checkLANServer()
-                    .then(status => {
-                        setSyncStatus(status.online ? `🟢 Online (${status.ip})` : '🔴 Offline');
-                        setServerIp(status.ip);
-                    })
-                    .catch(err => console.log('Sync Check Error:', err));
-            })
-            .catch(err => console.log('Sync Init Error:', err));
-    }, []);
 
     // Recording timer
     useEffect(() => {
@@ -158,12 +124,6 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
                 break;
             case 'navigation':
                 handleNavigation();
-                break;
-            case 'kiwix':
-                KiwixService.launch();
-                break;
-            case 'tailscale':
-                setSyncModalVisible(true);
                 break;
         }
     };
@@ -435,82 +395,6 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
                     </View>
                 </View>
             </Modal>
-
-            {/* Sync Config / Tailscale Modal */}
-            <Modal
-                visible={syncModalVisible}
-                transparent
-                animationType="slide"
-                onRequestClose={() => setSyncModalVisible(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>🔗 Tailscale Sync</Text>
-                            <TouchableOpacity
-                                onPress={() => setSyncModalVisible(false)}
-                                style={styles.closeButton}
-                            >
-                                <Text style={styles.closeButtonText}>✕</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        <Text style={styles.modalSubtitle}>Server Connection</Text>
-
-                        <View style={styles.statusRow}>
-                            <Text style={styles.statusText}>{syncStatus}</Text>
-                        </View>
-
-                        <TextInput
-                            style={styles.titleInput}
-                            placeholder="Server IP (e.g. 100.x.y.z)"
-                            placeholderTextColor={colors.textMuted}
-                            value={serverIp}
-                            onChangeText={setServerIp}
-                            keyboardType="numeric"
-                        />
-
-                        <TouchableOpacity
-                            style={styles.actionButton}
-                            onPress={async () => {
-                                await SyncthingService.setLANServerIP(serverIp);
-                                const status = await SyncthingService.checkLANServer();
-                                setSyncStatus(status.online ? `🟢 Online (${status.ip})` : '🔴 Offline');
-                            }}
-                        >
-                            <Text style={styles.actionButtonText}>Save & Check</Text>
-                        </TouchableOpacity>
-
-                        <Text style={styles.modalSubtitle}>Utilities</Text>
-
-                        <View style={styles.buttonRow}>
-                            <TouchableOpacity
-                                style={styles.utilityButton}
-                                onPress={() => SyncthingService.openTailscale()}
-                            >
-                                <Text style={styles.utilityButtonText}>Open Tailscale</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.utilityButton, styles.syncButton]}
-                                onPress={async () => {
-                                    setIsSyncing(true);
-                                    // Simulated full sync or push
-                                    // For now just check health again
-                                    const status = await SyncthingService.checkLANServer();
-                                    setSyncStatus(status.online ? '🟢 Synced Just Now' : '🔴 Failed');
-                                    setIsSyncing(false);
-                                }}
-                                disabled={isSyncing}
-                            >
-                                <Text style={[styles.utilityButtonText, styles.syncButtonText]}>
-                                    {isSyncing ? 'Syncing...' : 'Sync Now'}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
         </View>
     );
 };
@@ -736,61 +620,6 @@ const styles = StyleSheet.create({
         ...typography.bodySmall,
         color: colors.textMuted,
         marginTop: spacing.xs,
-    },
-
-    // Sync Modal Extra Styles
-    modalSubtitle: {
-        ...typography.labelSmall,
-        color: colors.textMuted,
-        marginBottom: spacing.xs,
-        marginTop: spacing.md,
-    },
-    statusRow: {
-        backgroundColor: colors.background,
-        padding: spacing.md,
-        borderRadius: 8,
-        marginBottom: spacing.md,
-    },
-    statusText: {
-        ...typography.bodyMedium,
-        color: colors.textPrimary,
-        fontWeight: 'bold',
-    },
-    actionButton: {
-        backgroundColor: colors.accentPrimary,
-        padding: spacing.md,
-        borderRadius: 8,
-        alignItems: 'center',
-        marginBottom: spacing.sm,
-    },
-    actionButtonText: {
-        ...typography.labelLarge,
-        color: colors.textPrimary,
-    },
-    buttonRow: {
-        flexDirection: 'row',
-        gap: spacing.md,
-        marginTop: spacing.lg,
-    },
-    utilityButton: {
-        flex: 1,
-        backgroundColor: colors.background,
-        padding: spacing.md,
-        borderRadius: 8,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-    utilityButtonText: {
-        ...typography.labelMedium,
-        color: colors.textPrimary,
-    },
-    syncButton: {
-        backgroundColor: colors.surfaceElevated,
-        borderColor: colors.success,
-    },
-    syncButtonText: {
-        color: colors.success,
     },
 });
 
