@@ -20,6 +20,7 @@ import {
     ActivityIndicator,
     Keyboard,
     Alert,
+    PermissionsAndroid,
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
 import { useLLM } from '../hooks';
@@ -236,25 +237,41 @@ export const AskScreen: React.FC<AskScreenProps> = ({
     };
 
     const handleDownloadModel = async (modelId: string) => {
+        // Request storage permissions on Android (older versions needed this, new ones strict but worth a try)
+        if (Platform.OS === 'android') {
+            try {
+                await PermissionsAndroid.requestMultiple([
+                    PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+                    PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+                ]);
+            } catch (err) {
+                console.warn(err);
+            }
+        }
+
         setDownloadProgress(0);
 
         try {
-            const success = await downloadModel(modelId as any, (progress) => {
+            const result = await downloadModel(modelId as any, (progress) => {
                 setDownloadProgress(progress);
             });
 
             setDownloadProgress(null);
 
-            if (success) {
+            if (result.success) {
+                console.log('Download successful, loading model...');
                 await loadModel(modelId as any);
                 setShowModelModal(false);
                 Alert.alert('Success', 'Model downloaded and loaded.');
             } else {
-                Alert.alert('Download Failed', 'Could not download the model. Check internet connection and storage.');
+                console.error('Download failed:', result.error);
+                const errorMessage = result.error || 'Check internet connection and storage.';
+                Alert.alert('Download Failed', `Step failed: ${errorMessage}`);
             }
-        } catch (error) {
+        } catch (error: any) {
             setDownloadProgress(null);
-            Alert.alert('Error', 'An unexpected error occurred during download.');
+            console.error('Unexpected download error:', error);
+            Alert.alert('Error', `An unexpected error occurred: ${error.message}`);
         }
     };
 
@@ -282,7 +299,7 @@ export const AskScreen: React.FC<AskScreenProps> = ({
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
                     <Text style={styles.glyph}>{glyphs.synthesis}</Text>
-                    <Text style={styles.title}>ASK</Text>
+                    <Text style={styles.title}>ASK (v2)</Text>
                 </View>
                 <TouchableOpacity
                     style={styles.modelButton}

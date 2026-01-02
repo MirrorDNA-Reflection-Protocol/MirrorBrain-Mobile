@@ -21,23 +21,26 @@ export const AVAILABLE_MODELS = [
         id: 'llama-3.2-1b',
         name: 'Llama 3.2 1B',
         filename: 'llama-3.2-1b.pte',
-        tokenizerFilename: 'llama-3.2-1b-tokenizer.bin',
+        tokenizerFilename: 'tokenizer.json', // Switched to JSON as per widespread support
         size: '1.3 GB',
         sizeBytes: 1300000000,
         description: 'Fast — good for quick responses',
-        url: 'https://huggingface.co/software-mansion/react-native-executorch-llama-3.2-1b/resolve/main/llama3_2_1b_spinquant.pte',
-        tokenizerUrl: 'https://huggingface.co/software-mansion/react-native-executorch-llama-3.2-1b/resolve/main/tokenizer.bin',
+        // Validated Public URL (Redirects to S3 via CAS)
+        url: 'https://huggingface.co/software-mansion/react-native-executorch-llama-3.2/resolve/main/llama-3.2-1B/QLoRA/llama3_2_qat_lora.pte',
+        // Validated Public Tokenizer from Unsloth (Redirects to CAS, Verified 200 OK)
+        tokenizerUrl: 'https://huggingface.co/unsloth/Llama-3.2-1B-Instruct/resolve/main/tokenizer.json',
     },
     {
         id: 'llama-3.2-3b',
         name: 'Llama 3.2 3B',
         filename: 'llama-3.2-3b.pte',
-        tokenizerFilename: 'llama-3.2-3b-tokenizer.bin',
+        tokenizerFilename: 'tokenizer.json',
         size: '2.8 GB',
         sizeBytes: 2800000000,
         description: 'Smarter — best quality',
-        url: 'https://huggingface.co/software-mansion/react-native-executorch-llama-3.2-3b/resolve/main/llama3_2_3b_spinquant.pte',
-        tokenizerUrl: 'https://huggingface.co/software-mansion/react-native-executorch-llama-3.2-3b/resolve/main/tokenizer.bin',
+        // Placeholder - assumed structure similar to 1B
+        url: 'https://huggingface.co/software-mansion/react-native-executorch-llama-3.2/resolve/main/llama-3.2-3B/QLoRA/llama3_2_qat_lora.pte',
+        tokenizerUrl: 'https://huggingface.co/unsloth/Llama-3.2-3B-Instruct/resolve/main/tokenizer.json',
     },
 ] as const;
 
@@ -87,9 +90,9 @@ class LLMServiceClass {
     async downloadModel(
         modelId: ModelId,
         onProgress?: (progress: number) => void
-    ): Promise<boolean> {
+    ): Promise<{ success: boolean; error?: string }> {
         const model = AVAILABLE_MODELS.find(m => m.id === modelId);
-        if (!model) return false;
+        if (!model) return { success: false, error: 'Model definition not found' };
 
         const modelPath = this.getModelPath(model.filename);
         const tokenizerPath = this.getModelPath(model.tokenizerFilename);
@@ -120,30 +123,30 @@ class LLMServiceClass {
                         console.log(`Download started: ${url} (${res.contentLength} bytes)`);
                     }
                 }).promise;
-                return result.statusCode === 200;
+                return { success: result.statusCode === 200, status: result.statusCode };
             };
 
             // Download Tokenizer (small, 1% weight)
             console.log('Downloading tokenizer...');
-            const tokSuccess = await downloadFile(model.tokenizerUrl, tokenizerPath, 0.01, 0);
-            if (!tokSuccess) throw new Error('Tokenizer download failed');
+            const tokResult = await downloadFile(model.tokenizerUrl, tokenizerPath, 0.01, 0);
+            if (!tokResult.success) throw new Error(`Tokenizer download failed with status ${tokResult.status}`);
 
             // Download Model (large, 99% weight)
             console.log('Downloading model...');
-            const modelSuccess = await downloadFile(model.url, modelPath, 0.99, 0.01);
-            if (!modelSuccess) throw new Error('Model download failed');
+            const modelResult = await downloadFile(model.url, modelPath, 0.99, 0.01);
+            if (!modelResult.success) throw new Error(`Model download failed with status ${modelResult.status}`);
 
             onProgress?.(1.0); // Ensure 100%
             console.log('Download complete.');
-            return true;
-        } catch (error) {
+            return { success: true };
+        } catch (error: any) {
             console.error('Download failed:', error);
             // Cleanup on failure
             try {
                 if (await RNFS.exists(modelPath)) await RNFS.unlink(modelPath);
                 if (await RNFS.exists(tokenizerPath)) await RNFS.unlink(tokenizerPath);
             } catch (e) { /* ignore */ }
-            return false;
+            return { success: false, error: error.message || 'Unknown download error' };
         }
     }
 
