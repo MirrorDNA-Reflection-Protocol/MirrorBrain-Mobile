@@ -263,8 +263,8 @@ export const AskScreen: React.FC<AskScreenProps> = ({
     return (
         <KeyboardAvoidingView
             style={styles.container}
-            behavior="padding"
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 60}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
             {/* Online banner */}
             {isOnline && (
@@ -475,18 +475,20 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                                     <Text style={styles.modelSize}>{model.size}</Text>
                                     <Text style={styles.modelDesc}>{model.description}</Text>
                                 </View>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.downloadButton,
-                                        loadedModel === model.id && styles.downloadButtonLoaded,
-                                    ]}
-                                    onPress={() => handleDownloadModel(model.id as 'qwen-2.5-1.5b' | 'smollm2-360m')}
-                                    disabled={isLoading || loadedModel === model.id}
-                                >
-                                    <Text style={styles.downloadButtonText}>
-                                        {loadedModel === model.id ? '✓ Loaded' : 'Download'}
-                                    </Text>
-                                </TouchableOpacity>
+                                <View style={styles.modelActions}>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.downloadButton,
+                                            loadedModel === model.id && styles.downloadButtonLoaded,
+                                        ]}
+                                        onPress={() => handleDownloadModel(model.id)}
+                                        disabled={isLoading}
+                                    >
+                                        <Text style={styles.downloadButtonText}>
+                                            {loadedModel === model.id ? 'Re-download' : 'Download'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         ))}
 
@@ -605,6 +607,11 @@ const styles = StyleSheet.create({
     },
     modelButton: {
         padding: spacing.sm,
+    },
+    modelActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
     },
     modelButtonText: {
         fontSize: 20,
