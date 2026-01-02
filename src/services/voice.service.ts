@@ -1,195 +1,260 @@
 /**
  * Voice Service — Recording and Transcription
- * From Spec Part VI
+ * Powered by ExecuTorch Whisper & LiveAudioStream
  * 
- * Record audio → Transcribe locally with Whisper → Save to Vault
- * 
- * NOTE: whisper.rn integration is a placeholder.
- * For a working implementation, install: npm install whisper.rn
- * and download whisper-tiny.bin model (~39MB)
+ * Flow:
+ * 1. Record 16kHz Mono PCM via LiveAudioStream
+ * 2. Buffer raw audio
+ * 3. On stop, convert to Float32Array
+ * 4. Transcribe via ExecuTorch SpeechToTextModule
  */
 
-import { PermissionsAndroid, Platform } from 'react-native';
+import { PermissionsAndroid, Platform, NativeEventEmitter } from 'react-native';
 import RNFS from 'react-native-fs';
+import LiveAudioStream from 'react-native-live-audio-stream';
+import { Buffer } from 'buffer';
 import { STORAGE_PATHS } from './vault.service';
 
-// Placeholder for whisper.rn - install separately
-// import { initWhisper, WhisperContext } from 'whisper.rn';
+// ExecuTorch imports
+// We'll lazy import these to avoid crashes if native modules aren't linked yet
+let SpeechToTextModule: any = null;
+let WHISPER_TINY_EN: any = null;
+let ResourceFetcher: any = null;
 
-interface RecordingState {
+interface VoiceState {
     isRecording: boolean;
-    filePath: string | null;
-    startTime: Date | null;
+    isProcessing: boolean;
+    modelLoaded: boolean;
 }
 
 class VoiceServiceClass {
-    private state: RecordingState = {
+    private state: VoiceState = {
         isRecording: false,
-        filePath: null,
-        startTime: null,
+        isProcessing: false,
+        modelLoaded: false,
     };
 
+    private sttInstance: any = null;
+    private audioBuffer: number[] = [];
     private hasPermission: boolean = false;
-    // private whisperContext: WhisperContext | null = null;
+
+    constructor() {
+        this.init();
+    }
+
+    private async init() {
+        if (Platform.OS === 'android') {
+            const granted = await PermissionsAndroid.check(
+                PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
+            );
+            this.hasPermission = granted;
+        } else {
+            this.hasPermission = true;
+        }
+
+        // Initialize Audio Stream
+        LiveAudioStream.init({
+            sampleRate: 16000,
+            channels: 1,
+            bitsPerSample: 16,
+            audioSource: 6, // VOICE_RECOGNITION
+            bufferSize: 4096,
+        });
+
+        LiveAudioStream.on('data', (data: string) => {
+            if (this.state.isRecording) {
+                this.processAudioData(data);
+            }
+        });
+    }
+
+    /**
+     * Lazy load ExecuTorch dependencies
+     */
+    private async loadDependencies() {
+        if (!SpeechToTextModule) {
+            const ET = await import('react-native-executorch');
+            SpeechToTextModule = ET.SpeechToTextModule;
+            WHISPER_TINY_EN = ET.WHISPER_TINY_EN;
+            ResourceFetcher = ET.ResourceFetcher;
+        }
+    }
+
+    /**
+     * Process incoming base64 audio chunk
+     */
+    private processAudioData(base64Data: string) {
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        // Convert Int16 buffer to Float32 array (-1.0 to 1.0)
+        // We push to temp array (not efficient for long recordings, but ok for voice commands)
+        for (let i = 0; i < buffer.length; i += 2) {
+            const int16 = buffer.readInt16LE(i);
+            const float32 = int16 / 32768.0;
+            this.audioBuffer.push(float32);
+        }
+    }
 
     /**
      * Request microphone permission
      */
     async requestPermission(): Promise<boolean> {
-        if (Platform.OS !== 'android') {
-            // iOS handles permissions differently
-            this.hasPermission = true;
-            return true;
-        }
+        if (Platform.OS !== 'android') return true;
 
         try {
             const granted = await PermissionsAndroid.request(
                 PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
                 {
                     title: 'Microphone Permission',
-                    message: 'MirrorBrain needs microphone access for voice capture.',
+                    message: 'MirrorBrain needs microphone access for voice input.',
                     buttonNeutral: 'Ask Later',
                     buttonNegative: 'Cancel',
                     buttonPositive: 'OK',
                 }
             );
-
             this.hasPermission = granted === PermissionsAndroid.RESULTS.GRANTED;
             return this.hasPermission;
         } catch (error) {
-            console.error('Failed to request mic permission:', error);
+            console.error('Permission request failed:', error);
             return false;
         }
     }
 
-    /**
-     * Check if Whisper model exists
-     */
-    async hasWhisperModel(): Promise<boolean> {
-        const modelPath = this.getWhisperModelPath();
+    async isModelAvailable(): Promise<boolean> {
+        await this.loadDependencies();
+        // Check for key file presence
+        // WHISPER_TINY_EN urls are opaque objects, but we can check if we downloaded them.
+        // For simplicity, we assume if we have the monolithic 'whisper_tiny_en' dir in our models, it's good.
+        // Actually, let's just rely on loadModel to fail nicely or succeed.
+        // Or check a sentinel file.
+        const modelPath = `${STORAGE_PATHS.ROOT}/${STORAGE_PATHS.MODELS}/whisper_tiny_en.sentinel`;
         return await RNFS.exists(modelPath);
     }
 
-    /**
-     * Get Whisper model path
-     */
-    getWhisperModelPath(): string {
-        return `${STORAGE_PATHS.ROOT}/${STORAGE_PATHS.MODELS}/whisper-tiny.bin`;
+    async downloadModel(onProgress?: (progress: number) => void): Promise<boolean> {
+        await this.loadDependencies();
+        try {
+            const modelConfig = WHISPER_TINY_EN;
+
+            // Download all 3 parts using ResourceFetcher
+            // We pass them all at once. ResourceFetcher calculates total progress.
+            const result = await ResourceFetcher.fetch(
+                (p: number) => onProgress?.(p),
+                modelConfig.encoderSource,
+                modelConfig.decoderSource,
+                modelConfig.tokenizerSource
+            );
+
+            if (result) {
+                // Create sentinel to mark success
+                const sentinelPath = `${STORAGE_PATHS.ROOT}/${STORAGE_PATHS.MODELS}/whisper_tiny_en.sentinel`;
+                if (!(await RNFS.exists(`${STORAGE_PATHS.ROOT}/${STORAGE_PATHS.MODELS}`))) {
+                    await RNFS.mkdir(`${STORAGE_PATHS.ROOT}/${STORAGE_PATHS.MODELS}`);
+                }
+                await RNFS.writeFile(sentinelPath, 'true', 'utf8');
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Whisper download failed:', error);
+            return false;
+        }
     }
 
     /**
-     * Start recording audio
+     * Load Whisper model into memory
      */
-    async startRecording(): Promise<boolean> {
-        if (this.state.isRecording) {
-            console.warn('Already recording');
+    async loadModel(): Promise<boolean> {
+        if (this.state.modelLoaded && this.sttInstance) return true;
+
+        await this.loadDependencies();
+
+        try {
+            this.sttInstance = new SpeechToTextModule();
+            await this.sttInstance.load(WHISPER_TINY_EN);
+            this.state.modelLoaded = true;
+            console.log('Whisper model loaded');
+            return true;
+        } catch (error) {
+            console.error('Failed to load Whisper:', error);
             return false;
         }
+    }
+
+    /**
+     * Start Recording
+     */
+    async startRecording(): Promise<boolean> {
+        if (this.state.isRecording) return false;
 
         if (!this.hasPermission) {
             const granted = await this.requestPermission();
-            if (!granted) {
-                console.error('Microphone permission denied');
-                return false;
-            }
+            if (!granted) return false;
         }
 
-        try {
-            const voiceDir = `${STORAGE_PATHS.ROOT}/${STORAGE_PATHS.CAPTURES_VOICE}`;
-            await RNFS.mkdir(voiceDir);
+        // Reset buffer
+        this.audioBuffer = [];
 
-            const filename = `voice-${Date.now()}.wav`;
-            const filePath = `${voiceDir}/${filename}`;
-
-            // TODO: Implement actual recording with react-native-audio-api or similar
-            // For now, just track state
-            this.state = {
-                isRecording: true,
-                filePath,
-                startTime: new Date(),
-            };
-
-            console.log('Recording started:', filePath);
-            return true;
-        } catch (error) {
-            console.error('Failed to start recording:', error);
-            return false;
-        }
+        this.state.isRecording = true;
+        LiveAudioStream.start();
+        console.log('Voice recording started');
+        return true;
     }
 
     /**
-     * Stop recording and return file path
+     * Stop Recording and Transcribe
      */
-    async stopRecording(): Promise<string | null> {
-        if (!this.state.isRecording) {
-            console.warn('Not recording');
-            return null;
-        }
+    async stopAndTranscribe(): Promise<string | null> {
+        if (!this.state.isRecording) return null;
 
         try {
-            // TODO: Stop actual recording
-            const filePath = this.state.filePath;
+            LiveAudioStream.stop();
+            this.state.isRecording = false;
+            this.state.isProcessing = true;
 
-            this.state = {
-                isRecording: false,
-                filePath: null,
-                startTime: null,
-            };
+            console.log(`Processing voice... ${this.audioBuffer.length} samples`);
 
-            console.log('Recording stopped:', filePath);
-            return filePath;
-        } catch (error) {
-            console.error('Failed to stop recording:', error);
-            return null;
-        }
-    }
-
-    /**
-     * Transcribe audio file using Whisper
-     */
-    async transcribe(audioPath: string): Promise<string | null> {
-        try {
-            // Check if model exists
-            const hasModel = await this.hasWhisperModel();
-            if (!hasModel) {
-                console.error('Whisper model not found. Download whisper-tiny.bin first.');
-                return null;
+            // Ensure model is loaded
+            if (!this.sttInstance) {
+                const loaded = await this.loadModel();
+                if (!loaded) return null;
             }
 
-            // TODO: Implement with whisper.rn when installed
-            // const modelPath = this.getWhisperModelPath();
-            // this.whisperContext = await initWhisper({ filePath: modelPath });
-            // const result = await this.whisperContext.transcribe(audioPath);
-            // return result.text;
+            // Transcribe
+            // ExecuTorch expects Float32Array
+            const waveform = new Float32Array(this.audioBuffer);
+            const result = await this.sttInstance.transcribe(waveform);
 
-            // Placeholder
-            console.log('Transcription would happen here for:', audioPath);
-            return '[Whisper transcription - install whisper.rn to enable]';
+            this.state.isProcessing = false;
+            console.log('Transcription result:', result);
+            return result;
+
         } catch (error) {
             console.error('Transcription failed:', error);
+            this.state.isProcessing = false;
             return null;
         }
     }
 
     /**
-     * Check recording state
+     * Cancel recording
      */
-    isRecording(): boolean {
+    async cancelRecording() {
+        if (this.state.isRecording) {
+            LiveAudioStream.stop();
+            this.state.isRecording = false;
+            this.audioBuffer = [];
+        }
+    }
+
+    isRecording() {
         return this.state.isRecording;
     }
 
-    /**
-     * Get recording duration in seconds
-     */
-    getRecordingDuration(): number {
-        if (!this.state.isRecording || !this.state.startTime) {
-            return 0;
-        }
-        return Math.floor((Date.now() - this.state.startTime.getTime()) / 1000);
+    isProcessing() {
+        return this.state.isProcessing;
     }
 }
 
-// Singleton export
 export const VoiceService = new VoiceServiceClass();
-
 export default VoiceService;

@@ -1,356 +1,285 @@
 /**
- * LLM Service — Local Inference via llama.rn
- * From Spec Part VII
+ * LLM Service — Local Inference via ExecuTorch
+ * Migrated from llama.rn for TPU/GPU acceleration
  * 
  * Recommended Model Stack:
- * - Qwen 2.5 1.5B (Q4_K_M) — Primary
- * - SmolLM2 360M (Q4_K_M) — Instant simple queries
+ * - Llama 3.2 1B — Fast, good quality
+ * - Llama 3.2 3B — Best quality (16GB RAM)
  * 
- * Performance Targets (Pixel 9 Pro XL):
- * - First token: Under 500ms
- * - Sustained: 30+ tokens/second
- * - Model cold load: Under 3 seconds
+ * Performance Targets (Pixel 9 Pro XL with ExecuTorch):
+ * - First token: Under 300ms
+ * - Sustained: 15-25 tokens/second
  */
 
-import { initLlama, type LlamaContext } from 'llama.rn';
 import RNFS from 'react-native-fs';
 import { STORAGE_PATHS } from './vault.service';
 import type { LLMConfig, CompletionResult, ChatMessage } from '../types';
 
-// Default stop tokens for various model families
-const STOP_TOKENS = [
-    '&lt;/s&gt;',
-    '&lt;|end|&gt;',
-    '&lt;|eot_id|&gt;',
-    '&lt;|end_of_text|&gt;',
-    '&lt;|im_end|&gt;',
-    '&lt;|EOT|&gt;',
-    '&lt;|END_OF_TURN_TOKEN|&gt;',
-    '&lt;|end_of_turn|&gt;',
-    '&lt;|endoftext|&gt;',
-];
-
-// Default config for Pixel 9 Pro XL
-const DEFAULT_CONFIG: LLMConfig = {
-    modelPath: '',
-    contextSize: 2048,
-    gpuLayers: 99, // Offload all layers to GPU
-};
-
-// Model info for downloading
+// Model info for ExecuTorch PTE format
 export const AVAILABLE_MODELS = [
     {
-        id: 'qwen-2.5-1.5b',
-        name: 'Qwen 2.5 1.5B',
-        filename: 'qwen-2.5-1.5b-q4_k_m.gguf',
-        size: '1.1 GB',
-        sizeBytes: 1100000000,
-        description: 'Primary — good reasoning, fast',
-        url: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
+        id: 'llama-3.2-1b',
+        name: 'Llama 3.2 1B',
+        filename: 'llama-3.2-1b.pte',
+        tokenizerFilename: 'llama-3.2-1b-tokenizer.bin',
+        size: '1.3 GB',
+        sizeBytes: 1300000000,
+        description: 'Fast — good for quick responses',
+        url: 'https://huggingface.co/software-mansion/react-native-executorch-llama-3.2-1b/resolve/main/llama3_2_1b_spinquant.pte',
+        tokenizerUrl: 'https://huggingface.co/software-mansion/react-native-executorch-llama-3.2-1b/resolve/main/tokenizer.bin',
     },
     {
-        id: 'smollm2-360m',
-        name: 'SmolLM2 360M',
-        filename: 'smollm2-360m-q4_k_m.gguf',
-        size: '250 MB',
-        sizeBytes: 250000000,
-        description: 'Instant simple queries',
-        url: 'https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q4_k_m.gguf',
+        id: 'llama-3.2-3b',
+        name: 'Llama 3.2 3B',
+        filename: 'llama-3.2-3b.pte',
+        tokenizerFilename: 'llama-3.2-3b-tokenizer.bin',
+        size: '2.8 GB',
+        sizeBytes: 2800000000,
+        description: 'Smarter — best quality',
+        url: 'https://huggingface.co/software-mansion/react-native-executorch-llama-3.2-3b/resolve/main/llama3_2_3b_spinquant.pte',
+        tokenizerUrl: 'https://huggingface.co/software-mansion/react-native-executorch-llama-3.2-3b/resolve/main/tokenizer.bin',
     },
 ] as const;
 
 export type ModelId = typeof AVAILABLE_MODELS[number]['id'];
 
+const DEFAULT_CONFIG: LLMConfig = {
+    modelPath: '',
+    contextSize: 2048,
+    gpuLayers: 99,
+};
+
 class LLMServiceClass {
-    private context: LlamaContext | null = null;
+    private llmInstance: any = null;
     private config: LLMConfig = DEFAULT_CONFIG;
     private isLoading: boolean = false;
     private loadedModel: string | null = null;
+    private currentResponse: string = '';
+    private tokenCallback: ((token: string) => void) | null = null;
 
-    /**
-     * Check if a model exists locally
-     */
     async modelExists(modelId: ModelId): Promise<boolean> {
         const model = AVAILABLE_MODELS.find(m => m.id === modelId);
         if (!model) return false;
-
         const modelPath = this.getModelPath(model.filename);
-        return await RNFS.exists(modelPath);
+        const tokenizerPath = this.getModelPath(model.tokenizerFilename);
+        return (await RNFS.exists(modelPath)) && (await RNFS.exists(tokenizerPath));
     }
 
-    /**
-     * Get path to model file
-     */
     getModelPath(filename: string): string {
         return `${STORAGE_PATHS.ROOT}/${STORAGE_PATHS.MODELS}/${filename}`;
     }
 
-    /**
-     * List locally available models
-     */
     async listLocalModels(): Promise<string[]> {
         const modelsDir = `${STORAGE_PATHS.ROOT}/${STORAGE_PATHS.MODELS}`;
-
         try {
-            const exists = await RNFS.exists(modelsDir);
-            if (!exists) {
+            if (!(await RNFS.exists(modelsDir))) {
                 await RNFS.mkdir(modelsDir);
                 return [];
             }
-
             const files = await RNFS.readDir(modelsDir);
-            return files
-                .filter(f => f.name.endsWith('.gguf'))
-                .map(f => f.name);
+            return files.filter(f => f.name.endsWith('.pte')).map(f => f.name);
         } catch (error) {
             console.error('Failed to list models:', error);
             return [];
         }
     }
 
-    /**
-     * Download a model from HuggingFace
-     */
     async downloadModel(
         modelId: ModelId,
         onProgress?: (progress: number) => void
     ): Promise<boolean> {
         const model = AVAILABLE_MODELS.find(m => m.id === modelId);
-        if (!model) {
-            console.error('Unknown model:', modelId);
-            return false;
-        }
+        if (!model) return false;
 
         const modelPath = this.getModelPath(model.filename);
+        const tokenizerPath = this.getModelPath(model.tokenizerFilename);
         const modelsDir = `${STORAGE_PATHS.ROOT}/${STORAGE_PATHS.MODELS}`;
 
         try {
-            // Ensure models directory exists
-            const exists = await RNFS.exists(modelsDir);
-            if (!exists) {
+            if (!(await RNFS.exists(modelsDir))) {
                 await RNFS.mkdir(modelsDir);
             }
 
-            // Download with progress
-            const downloadResult = RNFS.downloadFile({
-                fromUrl: model.url,
-                toFile: modelPath,
-                progress: (res) => {
-                    const progress = res.bytesWritten / res.contentLength;
-                    onProgress?.(progress);
-                },
-                progressInterval: 500,
-            });
+            console.log(`Starting download for ${model.name}...`);
 
-            const result = await downloadResult.promise;
+            // Helper to download a single file
+            const downloadFile = async (url: string, dest: string, weight: number, offset: number) => {
+                let lastProgress = 0;
+                const result = await RNFS.downloadFile({
+                    fromUrl: url,
+                    toFile: dest,
+                    progress: (res) => {
+                        const dlProgress = res.bytesWritten / res.contentLength;
+                        if (dlProgress - lastProgress > 0.01) {
+                            lastProgress = dlProgress;
+                            // Calculate total progress: offset + (this_file_progress * this_file_weight)
+                            onProgress?.(offset + (dlProgress * weight));
+                        }
+                    },
+                    begin: (res) => {
+                        console.log(`Download started: ${url} (${res.contentLength} bytes)`);
+                    }
+                }).promise;
+                return result.statusCode === 200;
+            };
 
-            if (result.statusCode === 200) {
-                console.log('Model downloaded:', modelPath);
-                return true;
-            } else {
-                console.error('Download failed with status:', result.statusCode);
-                return false;
-            }
+            // Download Tokenizer (small, 1% weight)
+            console.log('Downloading tokenizer...');
+            const tokSuccess = await downloadFile(model.tokenizerUrl, tokenizerPath, 0.01, 0);
+            if (!tokSuccess) throw new Error('Tokenizer download failed');
+
+            // Download Model (large, 99% weight)
+            console.log('Downloading model...');
+            const modelSuccess = await downloadFile(model.url, modelPath, 0.99, 0.01);
+            if (!modelSuccess) throw new Error('Model download failed');
+
+            onProgress?.(1.0); // Ensure 100%
+            console.log('Download complete.');
+            return true;
         } catch (error) {
-            console.error('Failed to download model:', error);
+            console.error('Download failed:', error);
+            // Cleanup on failure
+            try {
+                if (await RNFS.exists(modelPath)) await RNFS.unlink(modelPath);
+                if (await RNFS.exists(tokenizerPath)) await RNFS.unlink(tokenizerPath);
+            } catch (e) { /* ignore */ }
             return false;
         }
     }
 
-    /**
-     * Load a model into memory
-     */
     async loadModel(modelId: ModelId): Promise<boolean> {
-        if (this.isLoading) {
-            console.warn('Model already loading');
-            return false;
-        }
+        if (this.isLoading) return false;
 
         const model = AVAILABLE_MODELS.find(m => m.id === modelId);
-        if (!model) {
-            console.error('Unknown model:', modelId);
-            return false;
-        }
-
-        const modelPath = this.getModelPath(model.filename);
-
-        // Check if model exists
-        const exists = await RNFS.exists(modelPath);
-        if (!exists) {
-            console.error('Model file not found:', modelPath);
-            return false;
-        }
+        if (!model) return false;
 
         this.isLoading = true;
 
         try {
-            // Release previous context if any
-            if (this.context) {
-                await this.context.release();
-                this.context = null;
+            const { LLMModule } = await import('react-native-executorch');
+
+            if (this.llmInstance) {
+                await this.unloadModel();
             }
 
-            // Initialize llama context
-            this.context = await initLlama({
-                model: `file://${modelPath}`,
-                use_mlock: true,
-                n_ctx: this.config.contextSize,
-                n_gpu_layers: this.config.gpuLayers,
+            this.llmInstance = new LLMModule({
+                tokenCallback: (token) => {
+                    this.currentResponse += token;
+                    this.tokenCallback?.(token);
+                }
+            });
+
+            const modelPath = this.getModelPath(model.filename);
+            const tokenizerPath = this.getModelPath(model.tokenizerFilename);
+
+            await this.llmInstance.load({
+                modelSource: `file://${modelPath}`,
+                tokenizerSource: `file://${tokenizerPath}`,
             });
 
             this.loadedModel = modelId;
             this.isLoading = false;
-
-            console.log('Model loaded:', modelId);
+            console.log('ExecuTorch model loaded:', modelId);
             return true;
         } catch (error) {
-            console.error('Failed to load model:', error);
+            console.error('Load failed:', error);
             this.isLoading = false;
             return false;
         }
     }
 
-    /**
-     * Check if model is loaded
-     */
     isModelLoaded(): boolean {
-        return this.context !== null;
+        return this.llmInstance !== null;
     }
 
-    /**
-     * Get loaded model ID
-     */
     getLoadedModel(): string | null {
         return this.loadedModel;
     }
 
-    /**
-     * Run chat completion
-     */
     async chat(
         messages: ChatMessage[],
         systemPrompt?: string,
         onToken?: (token: string) => void
     ): Promise<CompletionResult | null> {
-        if (!this.context) {
-            console.error('No model loaded');
-            return null;
-        }
+        if (!this.llmInstance) return null;
 
         try {
-            const formattedMessages = [
-                ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
-                ...messages.map(m => ({
-                    role: m.role,
-                    content: m.content,
-                })),
-            ];
+            this.currentResponse = '';
+            this.tokenCallback = onToken || null;
 
             const startTime = Date.now();
-            let tokenCount = 0;
 
-            const result = await this.context.completion(
-                {
-                    messages: formattedMessages,
-                    n_predict: 512,
-                    stop: STOP_TOKENS,
-                    temperature: 0.7,
-                    top_p: 0.9,
-                },
-                (data) => {
-                    tokenCount++;
-                    if (data.token && onToken) {
-                        onToken(data.token);
-                    }
-                }
-            );
+            // Format messages for ExecuTorch LLMModule
+            const etMessages = [
+                ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
+                ...messages.map(m => ({ role: m.role as any, content: m.content }))
+            ];
 
+            const response = await this.llmInstance.generate(etMessages);
             const elapsed = (Date.now() - startTime) / 1000;
+            const tokenCount = this.currentResponse.length / 4; // Rough estimate if not tracked
 
             return {
-                text: result.text,
+                text: response,
                 tokensPerSecond: tokenCount / elapsed,
-                totalTokens: tokenCount,
+                totalTokens: Math.round(tokenCount),
             };
         } catch (error) {
-            console.error('Completion failed:', error);
+            console.error('Chat failed:', error);
             return null;
+        } finally {
+            this.tokenCallback = null;
         }
     }
 
-    /**
-     * Run text completion (non-chat)
-     */
     async complete(
         prompt: string,
         maxTokens: number = 256,
         onToken?: (token: string) => void
     ): Promise<CompletionResult | null> {
-        if (!this.context) {
-            console.error('No model loaded');
-            return null;
-        }
+        if (!this.llmInstance) return null;
 
         try {
+            this.currentResponse = '';
+            this.tokenCallback = onToken || null;
             const startTime = Date.now();
-            let tokenCount = 0;
 
-            const result = await this.context.completion(
-                {
-                    prompt,
-                    n_predict: maxTokens,
-                    stop: STOP_TOKENS,
-                    temperature: 0.7,
-                },
-                (data) => {
-                    tokenCount++;
-                    if (data.token && onToken) {
-                        onToken(data.token);
-                    }
-                }
-            );
-
+            // Use forward for single prompt completion if generate feels too chat-centric
+            // or just use generate with a single user message.
+            const response = await this.llmInstance.forward(prompt);
             const elapsed = (Date.now() - startTime) / 1000;
+            const tokenCount = this.currentResponse.length / 4;
 
             return {
-                text: result.text,
+                text: response,
                 tokensPerSecond: tokenCount / elapsed,
-                totalTokens: tokenCount,
+                totalTokens: Math.round(tokenCount),
             };
         } catch (error) {
-            console.error('Completion failed:', error);
+            console.error('Complete failed:', error);
             return null;
+        } finally {
+            this.tokenCallback = null;
         }
     }
 
-    /**
-     * Release model from memory
-     */
     async unloadModel(): Promise<void> {
-        if (this.context) {
-            await this.context.release();
-            this.context = null;
+        if (this.llmInstance) {
+            await this.llmInstance.delete();
+            this.llmInstance = null;
             this.loadedModel = null;
             console.log('Model unloaded');
         }
     }
 
-    /**
-     * Get loading state
-     */
     isLoadingModel(): boolean {
         return this.isLoading;
     }
 
-    /**
-     * Update config
-     */
     setConfig(config: Partial<LLMConfig>): void {
         this.config = { ...this.config, ...config };
     }
 }
 
-// Singleton export
 export const LLMService = new LLMServiceClass();
-
 export default LLMService;

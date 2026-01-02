@@ -69,11 +69,24 @@ class SyncthingServiceClass {
      */
     async openSyncthing(): Promise<void> {
         try {
-            // Try to open Syncthing Android app
             await Linking.openURL('syncthing://');
         } catch {
-            // Fallback to Play Store
             await Linking.openURL('market://details?id=com.nutomic.syncthingandroid');
+        }
+    }
+
+    /**
+     * Open Tailscale app
+     */
+    async openTailscale(): Promise<void> {
+        try {
+            // Tailscale doesn't have a known scheme, try generic package launch or Play Store
+            const PACKAGE_ID = 'com.tailscale.ipn';
+            await Linking.openURL(`market://launch?id=${PACKAGE_ID}`).catch(() => {
+                Linking.openURL(`market://details?id=${PACKAGE_ID}`);
+            });
+        } catch {
+            await Linking.openURL('market://details?id=com.tailscale.ipn');
         }
     }
 
@@ -143,6 +156,29 @@ class SyncthingServiceClass {
         } catch (error) {
             console.error('Remote search failed:', error);
             return [];
+        }
+    }
+
+    /**
+     * Push capture to server
+     */
+    async pushCapture(item: any): Promise<boolean> {
+        const server = await this.checkLANServer();
+        if (!server.online) return false;
+
+        try {
+            const response = await fetch(
+                `http://${server.ip}:${server.port}/vault/capture`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(item),
+                }
+            );
+            return response.ok;
+        } catch (error) {
+            console.error('Push failed:', error);
+            return false;
         }
     }
 
