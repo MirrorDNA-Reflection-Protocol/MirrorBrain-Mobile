@@ -44,14 +44,15 @@ export const AVAILABLE_MODELS = [
     },
     {
         id: 'network-test',
-        name: 'DEBUG: Network Test',
-        filename: 'network_test.json',
+        name: 'DEBUG: Network Test (Generic)',
+        filename: 'network_test.zip',
         tokenizerFilename: 'tokenizer_test.json',
-        size: '17 MB',
-        sizeBytes: 17000000,
-        description: 'Verifies Internet Access',
-        // Using the known working tokenizer URL for both to prove success
-        url: 'https://huggingface.co/unsloth/Llama-3.2-1B-Instruct/resolve/main/tokenizer.json',
+        size: '10 MB',
+        sizeBytes: 10000000,
+        description: 'Verifies Internet Access (Non-HF)',
+        // Using a standard reliable large file from a CDN to rule out HF specific blocks
+        url: 'https://github.com/StartBootstrap/startbootstrap-agency/archive/master.zip',
+        // Using the Unsloth tokenizer which we know works (200 OK)
         tokenizerUrl: 'https://huggingface.co/unsloth/Llama-3.2-1B-Instruct/resolve/main/tokenizer.json',
     },
 ] as const;
