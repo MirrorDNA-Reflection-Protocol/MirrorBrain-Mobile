@@ -42,6 +42,18 @@ export const AVAILABLE_MODELS = [
         url: 'https://huggingface.co/software-mansion/react-native-executorch-llama-3.2/resolve/main/llama-3.2-3B/QLoRA/llama3_2_qat_lora.pte',
         tokenizerUrl: 'https://huggingface.co/unsloth/Llama-3.2-3B-Instruct/resolve/main/tokenizer.json',
     },
+    {
+        id: 'network-test',
+        name: 'DEBUG: Network Test',
+        filename: 'network_test.json',
+        tokenizerFilename: 'tokenizer_test.json',
+        size: '17 MB',
+        sizeBytes: 17000000,
+        description: 'Verifies Internet Access',
+        // Using the known working tokenizer URL for both to prove success
+        url: 'https://huggingface.co/unsloth/Llama-3.2-1B-Instruct/resolve/main/tokenizer.json',
+        tokenizerUrl: 'https://huggingface.co/unsloth/Llama-3.2-1B-Instruct/resolve/main/tokenizer.json',
+    },
 ] as const;
 
 export type ModelId = typeof AVAILABLE_MODELS[number]['id'];
