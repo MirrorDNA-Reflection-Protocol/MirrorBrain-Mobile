@@ -1,0 +1,97 @@
+/**
+ * Device Service — Real Device Signals
+ * 
+ * Battery level, connectivity status, and other system info.
+ */
+
+import { Platform } from 'react-native';
+import DeviceInfo from 'react-native-device-info';
+
+// Battery types for Android
+interface BatteryInfo {
+    level: number;       // 0-100
+    charging: boolean;
+}
+
+interface ConnectivityInfo {
+    connected: boolean;
+    type: 'wifi' | 'cellular' | 'none';
+}
+
+class DeviceServiceClass {
+    private batteryListeners: Set<(info: BatteryInfo) => void> = new Set();
+
+    /**
+     * Get current battery level using react-native-device-info
+     * Returns real device battery on Android and iOS
+     */
+    async getBatteryLevel(): Promise<BatteryInfo> {
+        try {
+            const level = await DeviceInfo.getBatteryLevel();
+            const charging = await DeviceInfo.isBatteryCharging();
+
+            return {
+                level: Math.round(level * 100), // API returns 0-1, convert to 0-100
+                charging,
+            };
+        } catch (error) {
+            console.warn('Battery read failed:', error);
+            return { level: -1, charging: false };
+        }
+    }
+
+    /**
+     * Format battery for display
+     */
+    formatBattery(info: BatteryInfo): string {
+        if (info.level < 0) return '??%';
+        const charge = info.charging ? '⚡' : '';
+        return `${Math.round(info.level)}%${charge}`;
+    }
+
+    /**
+     * Get battery icon based on level
+     */
+    getBatteryIcon(level: number): string {
+        if (level < 0) return '🔋';
+        if (level <= 10) return '🪫';
+        if (level <= 25) return '🔋';
+        return '🔋';
+    }
+
+    /**
+     * Get connectivity status
+     */
+    async getConnectivity(): Promise<ConnectivityInfo> {
+        // Placeholder - real implementation would use @react-native-community/netinfo
+        return {
+            connected: true,
+            type: 'wifi',
+        };
+    }
+
+    /**
+     * Get device model
+     */
+    getDeviceModel(): string {
+        if (Platform.OS === 'android') {
+            return 'Android Device';
+        }
+        return 'iOS Device';
+    }
+
+    /**
+     * Format time remaining (placeholder)
+     */
+    getTimeRemaining(batteryLevel: number): string {
+        if (batteryLevel < 0) return 'Unknown';
+        // Rough estimate: ~1% per 6 minutes on standby
+        const hoursRemaining = Math.round((batteryLevel / 100) * 10);
+        return `~${hoursRemaining}h`;
+    }
+}
+
+// Singleton export
+export const DeviceService = new DeviceServiceClass();
+
+export default DeviceService;
