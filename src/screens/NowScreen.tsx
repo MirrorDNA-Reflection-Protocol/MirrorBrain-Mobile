@@ -18,7 +18,11 @@ import {
     Modal,
     TextInput,
     FlatList,
+    Image,
 } from 'react-native';
+
+// Logo asset
+const MirrorBrainLogo = require('../assets/logo.png');
 import { colors, typography, spacing, glyphs } from '../theme';
 import type { NowPanelData, Signal } from '../types';
 import {
@@ -224,9 +228,7 @@ export const NowScreen: React.FC<NowScreenProps> = ({
             >
                 {/* Header */}
                 <View style={styles.header}>
-                    <Animated.Text style={[styles.glyph, { transform: [{ scale: pulseAnim }] }]}>
-                        {glyphs.truth}
-                    </Animated.Text>
+                    <Image source={MirrorBrainLogo} style={styles.logo} />
                     <Text style={styles.title}>NOW</Text>
                 </View>
 
@@ -357,6 +359,7 @@ const styles = StyleSheet.create({
 
     // Header
     header: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+    logo: { width: 36, height: 36, marginRight: spacing.sm, borderRadius: 8 },
     glyph: { fontSize: 28, color: colors.glyphTruth, marginRight: spacing.sm },
     title: { ...typography.displayLarge, color: colors.textPrimary, letterSpacing: 2 },
 

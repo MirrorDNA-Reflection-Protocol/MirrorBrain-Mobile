@@ -16,3 +16,8 @@ export { WeatherService, type WeatherData } from './weather.service';
 export { ContactsService, type PriorityContact } from './contacts.service';
 export { SyncthingService, type SyncthingStatus, type LANServerStatus } from './syncthing.service';
 export * from './HapticSymphony';
+
+// Chrysalis V2 — Agent OS
+export { OrchestratorService, type Tool, type ToolResult, type OrchestrationResult } from './orchestrator.service';
+export { registerDeviceTools, getRegisteredToolNames } from './device.tools';
+export { A2ABridge, type DeviceIdentity, type RemoteDevice } from './a2a.bridge';
