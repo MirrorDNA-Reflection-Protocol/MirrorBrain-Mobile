@@ -1,0 +1,3 @@
+INFO:root:Agent Brain listening on port 50051
+INFO:root:Received Execute Request: TEST_ACTION | Params: {'foo': 'bar'}
+INFO:root:Streaming events for client: test-client

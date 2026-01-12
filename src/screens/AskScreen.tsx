@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
 import { useLLM } from '../hooks';
-import { VaultService, IdentityService } from '../services';
+import { VaultService, IdentityService, HapticSymphony, VoiceService } from '../services';
 import type { AskMode, ChatMessage, SessionClosure } from '../types';
 
 // System prompt for MirrorMesh
@@ -51,6 +51,9 @@ export const AskScreen: React.FC<AskScreenProps> = ({
     const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
     const scrollViewRef = useRef<ScrollView>(null);
 
+    // Voice State
+    const [isListening, setIsListening] = useState(false);
+
     const {
         isModelLoaded,
         loadedModel,
@@ -62,6 +65,30 @@ export const AskScreen: React.FC<AskScreenProps> = ({
         availableModels,
         checkModelExists,
     } = useLLM();
+
+    // Voice Handlers
+    const handleStartVoice = async () => {
+        HapticSymphony.tap(); // Initial cue
+        setInput('');
+        setIsListening(true);
+
+        const started = await VoiceService.startListening((text, isFinal) => {
+            setInput(text);
+            if (isFinal) {
+                // Optional: Auto-send on final silence? For now let user confirm.
+            }
+        });
+
+        if (!started) {
+            setIsListening(false);
+        }
+    };
+
+    const handleStopVoice = async () => {
+        HapticSymphony.select(); // Confirmation cue
+        await VoiceService.stopListening();
+        setIsListening(false);
+    };
 
     // Check for model on mount
     useEffect(() => {
@@ -77,6 +104,22 @@ export const AskScreen: React.FC<AskScreenProps> = ({
             setShowModelModal(true);
         }
     };
+
+    // Haptic Heartbeat during generation
+    useEffect(() => {
+        let heartbeatInterval: NodeJS.Timeout;
+        if (isGenerating) {
+            // Initial beat
+            HapticSymphony.heartbeat();
+            // Rhythm
+            heartbeatInterval = setInterval(() => {
+                HapticSymphony.heartbeat();
+            }, 2000); // Slow, deliberate thought rhythm
+        }
+        return () => {
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+        };
+    }, [isGenerating]);
 
     const handleModeChange = (newMode: AskMode) => {
         setMode(newMode);
@@ -124,14 +167,19 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                 }
             }
 
-            // Stream response
-            const result = await chat(
-                newMessages,
-                systemPrompt,
-                (token) => {
-                    setStreamingText(prev => prev + token);
-                }
-            );
+            // Stream response with minimum thinking time (Pinnacle Experience)
+            const thinkingDelay = new Promise(resolve => setTimeout(resolve, 2000)); // 2s minimum heartbeats
+
+            const [result] = await Promise.all([
+                chat(
+                    newMessages,
+                    systemPrompt,
+                    (token) => {
+                        setStreamingText(prev => prev + token);
+                    }
+                ),
+                thinkingDelay
+            ]);
 
             if (result) {
                 const assistantMessage: ChatMessage = {
@@ -165,13 +213,21 @@ export const AskScreen: React.FC<AskScreenProps> = ({
     };
 
     const handleClosure = async (closure: SessionClosure) => {
-        // Save session to vault
+        // 1. Physical confirmation (The Shatter)
+        await HapticSymphony.shatter();
+
+        // 2. Visual confirmation (could add a toast here, for now just a small pause)
+        await new Promise(r => setTimeout(r, 500));
+
+        // 3. Save session to vault
         await VaultService.saveSession(messages, closure);
 
-        // Clear session
+        // 4. Clear connection
         setMessages([]);
         setStreamingText('');
     };
+
+
 
     const handleDownloadModel = async (modelId: 'qwen-2.5-1.5b' | 'smollm2-360m') => {
         setDownloadProgress(0);
@@ -329,10 +385,19 @@ export const AskScreen: React.FC<AskScreenProps> = ({
 
             {/* Input area */}
             <View style={styles.inputContainer}>
+                <TouchableOpacity
+                    style={styles.micButton}
+                    onPress={isListening ? handleStopVoice : handleStartVoice}
+                >
+                    <Text style={styles.micButtonText}>
+                        {isListening ? '🛑' : '🎤'}
+                    </Text>
+                </TouchableOpacity>
+
                 <TextInput
                     style={styles.input}
-                    placeholder={getPlaceholder(mode)}
-                    placeholderTextColor={colors.textMuted}
+                    placeholder={isListening ? "Listening..." : getPlaceholder(mode)}
+                    placeholderTextColor={isListening ? colors.accentPrimary : colors.textMuted}
                     value={input}
                     onChangeText={setInput}
                     multiline
@@ -355,6 +420,20 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                     )}
                 </TouchableOpacity>
             </View>
+
+            {/* Voice Overlay */}
+            {isListening && (
+                <TouchableOpacity
+                    style={styles.voiceOverlay}
+                    activeOpacity={1}
+                    onPress={handleStopVoice}
+                >
+                    <View style={[styles.voiceIndicator, { transform: [{ scale: 1.2 }] }]}>
+                        <Text style={styles.voiceGlyph}>🎤</Text>
+                        <Text style={styles.voiceText}>Listening...</Text>
+                    </View>
+                </TouchableOpacity>
+            )}
 
             {/* Model download modal */}
             <Modal
@@ -812,6 +891,47 @@ const styles = StyleSheet.create({
     loadingText: {
         ...typography.labelSmall,
         color: colors.textMuted,
+    },
+
+    // Voice Overlay
+    voiceOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 100,
+    },
+    voiceIndicator: {
+        backgroundColor: colors.surfaceElevated,
+        padding: spacing.xl,
+        borderRadius: 24,
+        alignItems: 'center',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 10,
+    },
+    voiceGlyph: {
+        fontSize: 48,
+        marginBottom: spacing.md,
+        color: colors.accentPrimary,
+    },
+    voiceText: {
+        ...typography.headlineMedium,
+        color: colors.textPrimary,
+    },
+    micButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: colors.surface,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: spacing.sm,
+    },
+    micButtonText: {
+        fontSize: 20,
     },
 });
 

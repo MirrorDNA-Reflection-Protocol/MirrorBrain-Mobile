@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package mirrorbrain;
+
+option java_package = "com.mirrorbrainmobile.grpc";
+option java_multiple_files = true;
+
+// The Bridge Service: Connects the 'Mind' (Python/Termux) to the 'Body' (Android System)
+service AgentBridge {
+  // Execute a specific action (e.g., "call mom", "launch app")
+  rpc Execute (ActionRequest) returns (ActionResponse) {}
+
+  // Stream system events to the brain (e.g., "notification received", "screen on")
+  rpc StreamEvents (EventStreamRequest) returns (stream SystemEvent) {}
+  
+  // Heartbeat to ensure connection is alive
+  rpc Ping (PingRequest) returns (PingResponse) {}
+}
+
+message ActionRequest {
+  string intent = 1; // e.g., "CALL", "LAUNCH_APP", "TOAST"
+  map<string, string> params = 2; // e.g., {"contact": "Mom"}, {"package": "com.android.settings"}
+  string request_id = 3;
+}
+
+message ActionResponse {
+  bool success = 1;
+  string message = 2; // Error message or success details
+  string result_json = 3; // Structured return data
+  string request_id = 4;
+}
+
+message EventStreamRequest {
+  string client_id = 1;
+}
+
+message SystemEvent {
+  string type = 1; // "NOTIFICATION", "BATTERY", "LOCATION", "CLIPBOARD"
+  string payload_json = 2;
+  int64 timestamp = 3;
+}
+
+message PingRequest {
+  int64 timestamp = 1;
+}
+
+message PingResponse {
+  int64 timestamp = 1;
+  bool ready = 2;
+}

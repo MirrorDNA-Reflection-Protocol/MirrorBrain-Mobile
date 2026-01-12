@@ -15,3 +15,4 @@ export { HapticService } from './haptic.service';
 export { WeatherService, type WeatherData } from './weather.service';
 export { ContactsService, type PriorityContact } from './contacts.service';
 export { SyncthingService, type SyncthingStatus, type LANServerStatus } from './syncthing.service';
+export * from './HapticSymphony';

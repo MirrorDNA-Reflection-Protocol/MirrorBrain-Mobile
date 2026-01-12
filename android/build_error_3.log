@@ -1,0 +1,518 @@
+> Task :gradle-plugin:settings-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:shared:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:shared:compileJava NO-SOURCE
+> Task :gradle-plugin:shared:processResources NO-SOURCE
+> Task :gradle-plugin:shared:classes UP-TO-DATE
+> Task :gradle-plugin:shared:jar UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:compileJava NO-SOURCE
+> Task :gradle-plugin:settings-plugin:pluginDescriptors UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:processResources UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:classes UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:jar UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:react-native-gradle-plugin:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:compileJava NO-SOURCE
+> Task :gradle-plugin:react-native-gradle-plugin:pluginDescriptors UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:processResources UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:classes UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:jar UP-TO-DATE
+
+> Configure project :react-native-reanimated
+Android gradle plugin: 8.12.0
+Gradle: 8.13
+
+> Task :app:generateAutolinkingNewArchitectureFiles UP-TO-DATE
+> Task :app:generateAutolinkingPackageList UP-TO-DATE
+> Task :app:generateCodegenSchemaFromJavaScript SKIPPED
+> Task :app:generateCodegenArtifactsFromSchema SKIPPED
+> Task :app:generateReactNativeEntryPoint UP-TO-DATE
+> Task :app:syncRNLlamaHtpAssets UP-TO-DATE
+> Task :llama.rn:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :llama.rn:generateCodegenArtifactsFromSchema UP-TO-DATE
+> Task :llama.rn:preBuild UP-TO-DATE
+> Task :react-native-async-storage_async-storage:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :react-native-async-storage_async-storage:generateCodegenArtifactsFromSchema UP-TO-DATE
+> Task :react-native-async-storage_async-storage:preBuild UP-TO-DATE
+> Task :react-native-calendar-events:preBuild UP-TO-DATE
+> Task :react-native-device-info:preBuild UP-TO-DATE
+> Task :react-native-fs:preBuild UP-TO-DATE
+> Task :react-native-haptic-feedback:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :react-native-haptic-feedback:generateCodegenArtifactsFromSchema UP-TO-DATE
+> Task :react-native-haptic-feedback:preBuild UP-TO-DATE
+> Task :react-native-reanimated:assertLatestReactNativeWithNewArchitectureTask SKIPPED
+> Task :react-native-reanimated:assertMinimalReactNativeVersionTask SKIPPED
+> Task :react-native-reanimated:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :react-native-reanimated:generateCodegenArtifactsFromSchema UP-TO-DATE
+> Task :react-native-reanimated:prepareReanimatedHeadersForPrefabs UP-TO-DATE
+> Task :react-native-reanimated:prepareWorkletsHeadersForPrefabs UP-TO-DATE
+> Task :react-native-reanimated:preBuild UP-TO-DATE
+> Task :react-native-safe-area-context:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :react-native-safe-area-context:generateCodegenArtifactsFromSchema UP-TO-DATE
+> Task :react-native-safe-area-context:preBuild UP-TO-DATE
+> Task :react-native-worklets-core:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :react-native-worklets-core:generateCodegenArtifactsFromSchema UP-TO-DATE
+> Task :react-native-worklets-core:prepareHeaders UP-TO-DATE
+> Task :react-native-worklets-core:preBuild UP-TO-DATE
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :llama.rn:preDebugBuild UP-TO-DATE
+> Task :llama.rn:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-async-storage_async-storage:preDebugBuild UP-TO-DATE
+> Task :react-native-async-storage_async-storage:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-calendar-events:preDebugBuild UP-TO-DATE
+> Task :react-native-calendar-events:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-device-info:preDebugBuild UP-TO-DATE
+> Task :react-native-device-info:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-fs:preDebugBuild UP-TO-DATE
+> Task :react-native-fs:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-haptic-feedback:preDebugBuild UP-TO-DATE
+> Task :react-native-haptic-feedback:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-reanimated:preDebugBuild UP-TO-DATE
+> Task :react-native-reanimated:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-safe-area-context:preDebugBuild UP-TO-DATE
+> Task :react-native-safe-area-context:writeDebugAarMetadata UP-TO-DATE
+> Task :react-native-worklets-core:preDebugBuild UP-TO-DATE
+> Task :react-native-worklets-core:writeDebugAarMetadata UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :llama.rn:generateDebugResValues UP-TO-DATE
+> Task :llama.rn:generateDebugResources UP-TO-DATE
+> Task :llama.rn:packageDebugResources UP-TO-DATE
+> Task :react-native-async-storage_async-storage:generateDebugResValues UP-TO-DATE
+> Task :react-native-async-storage_async-storage:generateDebugResources UP-TO-DATE
+> Task :react-native-async-storage_async-storage:packageDebugResources UP-TO-DATE
+> Task :react-native-calendar-events:generateDebugResValues UP-TO-DATE
+> Task :react-native-calendar-events:generateDebugResources UP-TO-DATE
+> Task :react-native-calendar-events:packageDebugResources UP-TO-DATE
+> Task :react-native-device-info:generateDebugResValues UP-TO-DATE
+> Task :react-native-device-info:generateDebugResources UP-TO-DATE
+> Task :react-native-device-info:packageDebugResources UP-TO-DATE
+> Task :react-native-fs:generateDebugResValues UP-TO-DATE
+> Task :react-native-fs:generateDebugResources UP-TO-DATE
+> Task :react-native-fs:packageDebugResources UP-TO-DATE
+> Task :react-native-haptic-feedback:generateDebugResValues UP-TO-DATE
+> Task :react-native-haptic-feedback:generateDebugResources UP-TO-DATE
+> Task :react-native-haptic-feedback:packageDebugResources UP-TO-DATE
+> Task :react-native-reanimated:generateDebugResValues UP-TO-DATE
+> Task :react-native-reanimated:generateDebugResources UP-TO-DATE
+> Task :react-native-reanimated:packageDebugResources UP-TO-DATE
+> Task :react-native-safe-area-context:generateDebugResValues UP-TO-DATE
+> Task :react-native-safe-area-context:generateDebugResources UP-TO-DATE
+> Task :react-native-safe-area-context:packageDebugResources UP-TO-DATE
+> Task :react-native-worklets-core:generateDebugResValues UP-TO-DATE
+> Task :react-native-worklets-core:generateDebugResources UP-TO-DATE
+> Task :react-native-worklets-core:packageDebugResources UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :llama.rn:extractDeepLinksDebug UP-TO-DATE
+> Task :llama.rn:processDebugManifest UP-TO-DATE
+> Task :react-native-async-storage_async-storage:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-async-storage_async-storage:processDebugManifest UP-TO-DATE
+> Task :react-native-calendar-events:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-calendar-events:processDebugManifest UP-TO-DATE
+> Task :react-native-device-info:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-device-info:processDebugManifest UP-TO-DATE
+> Task :react-native-fs:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-fs:processDebugManifest UP-TO-DATE
+> Task :react-native-haptic-feedback:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-haptic-feedback:processDebugManifest UP-TO-DATE
+> Task :react-native-reanimated:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-reanimated:processDebugManifest UP-TO-DATE
+> Task :react-native-safe-area-context:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-safe-area-context:processDebugManifest UP-TO-DATE
+> Task :react-native-worklets-core:extractDeepLinksDebug UP-TO-DATE
+> Task :react-native-worklets-core:processDebugManifest UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :llama.rn:compileDebugLibraryResources UP-TO-DATE
+> Task :llama.rn:parseDebugLocalResources UP-TO-DATE
+> Task :llama.rn:generateDebugRFile UP-TO-DATE
+> Task :react-native-async-storage_async-storage:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-async-storage_async-storage:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-async-storage_async-storage:generateDebugRFile UP-TO-DATE
+> Task :react-native-calendar-events:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-calendar-events:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-calendar-events:generateDebugRFile UP-TO-DATE
+> Task :react-native-device-info:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-device-info:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-device-info:generateDebugRFile UP-TO-DATE
+> Task :react-native-fs:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-fs:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-fs:generateDebugRFile UP-TO-DATE
+> Task :react-native-haptic-feedback:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-haptic-feedback:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-haptic-feedback:generateDebugRFile UP-TO-DATE
+> Task :react-native-reanimated:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-reanimated:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-reanimated:generateDebugRFile UP-TO-DATE
+> Task :react-native-safe-area-context:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-safe-area-context:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-safe-area-context:generateDebugRFile UP-TO-DATE
+> Task :react-native-worklets-core:compileDebugLibraryResources UP-TO-DATE
+> Task :react-native-worklets-core:parseDebugLocalResources UP-TO-DATE
+> Task :react-native-worklets-core:generateDebugRFile UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :llama.rn:generateDebugBuildConfig UP-TO-DATE
+> Task :llama.rn:javaPreCompileDebug UP-TO-DATE
+> Task :llama.rn:compileDebugJavaWithJavac UP-TO-DATE
+> Task :llama.rn:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-async-storage_async-storage:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-async-storage_async-storage:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-async-storage_async-storage:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-async-storage_async-storage:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-calendar-events:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-calendar-events:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-calendar-events:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-calendar-events:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-device-info:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-device-info:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-device-info:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-device-info:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-fs:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-fs:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-fs:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-fs:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-haptic-feedback:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-haptic-feedback:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-haptic-feedback:compileDebugJavaWithJavac UP-TO-DATE
+> Task :react-native-haptic-feedback:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :react-native-reanimated:generateDebugBuildConfig UP-TO-DATE
+> Task :react-native-reanimated:javaPreCompileDebug UP-TO-DATE
+> Task :react-native-reanimated:packageNdkLibs NO-SOURCE
+
+> Task :react-native-reanimated:compileDebugJavaWithJavac FAILED
+/Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/reactNativeVersionPatch/ReanimatedUIManager/latest/com/swmansion/reanimated/ReanimatedModule.java:13: error: cannot find symbol
+import com.facebook.react.uimanager.UIManagerModuleListener;
+                                   ^
+  symbol:   class UIManagerModuleListener
+  location: package com.facebook.react.uimanager
+/Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/reactNativeVersionPatch/ReanimatedUIManager/latest/com/swmansion/reanimated/ReanimatedModule.java:20: error: cannot find symbol
+    implements LifecycleEventListener, UIManagerModuleListener, UIManagerListener {
+                                       ^
+  symbol: class UIManagerModuleListener
+/Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/main/java/com/swmansion/reanimated/ReanimatedPackage.java:72: error: cannot find symbol
+    Systrace.beginSection(Systrace.TRACE_TAG_REACT_JAVA_BRIDGE, "createUIManagerModule");
+                                  ^
+  symbol:   variable TRACE_TAG_REACT_JAVA_BRIDGE
+  location: class Systrace
+/Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/main/java/com/swmansion/reanimated/ReanimatedPackage.java:80: error: cannot find symbol
+      Systrace.endSection(Systrace.TRACE_TAG_REACT_JAVA_BRIDGE);
+                                  ^
+  symbol:   variable TRACE_TAG_REACT_JAVA_BRIDGE
+  location: class Systrace
+/Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/reactNativeVersionPatch/ReanimatedUIManager/latest/com/swmansion/reanimated/ReanimatedModule.java:83: error: cannot find symbol
+      uiManager.addUIManagerListener(this);
+               ^
+  symbol:   method addUIManagerListener(ReanimatedModule)
+  location: variable uiManager of type UIManagerModule
+/Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/reactNativeVersionPatch/ReanimatedUIManager/latest/com/swmansion/reanimated/ReanimatedModule.java:107: error: method does not override or implement a method from a supertype
+  @Override
+  ^
+/Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/reactNativeVersionPatch/BorderRadiiDrawableUtils/latest/com/swmansion/reanimated/BorderRadiiDrawableUtils.java:21: error: method resolve in class LengthPercentage cannot be applied to given types;
+    return length.resolve(bounds.width(), bounds.height()).toPixelFromDIP().getHorizontal();
+                 ^
+  required: float
+  found:    int,int
+  reason: actual and formal argument lists differ in length
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+7 errors
+
+[Incubating] Problems report is available at: file:///Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/android/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':react-native-reanimated:compileDebugJavaWithJavac'.
+> Compilation failed; see the compiler output below.
+  /Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/reactNativeVersionPatch/ReanimatedUIManager/latest/com/swmansion/reanimated/ReanimatedModule.java:13: error: cannot find symbol
+  import com.facebook.react.uimanager.UIManagerModuleListener;
+                                     ^
+    symbol:   class UIManagerModuleListener
+    location: package com.facebook.react.uimanager
+  /Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/reactNativeVersionPatch/ReanimatedUIManager/latest/com/swmansion/reanimated/ReanimatedModule.java:20: error: cannot find symbol
+      implements LifecycleEventListener, UIManagerModuleListener, UIManagerListener {
+                                         ^
+    symbol: class UIManagerModuleListener
+  /Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/main/java/com/swmansion/reanimated/ReanimatedPackage.java:72: error: cannot find symbol
+      Systrace.beginSection(Systrace.TRACE_TAG_REACT_JAVA_BRIDGE, "createUIManagerModule");
+                                    ^
+    symbol:   variable TRACE_TAG_REACT_JAVA_BRIDGE
+    location: class Systrace
+  /Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/main/java/com/swmansion/reanimated/ReanimatedPackage.java:80: error: cannot find symbol
+        Systrace.endSection(Systrace.TRACE_TAG_REACT_JAVA_BRIDGE);
+                                    ^
+    symbol:   variable TRACE_TAG_REACT_JAVA_BRIDGE
+    location: class Systrace
+  /Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/reactNativeVersionPatch/ReanimatedUIManager/latest/com/swmansion/reanimated/ReanimatedModule.java:83: error: cannot find symbol
+        uiManager.addUIManagerListener(this);
+                 ^
+    symbol:   method addUIManagerListener(ReanimatedModule)
+    location: variable uiManager of type UIManagerModule
+  /Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/reactNativeVersionPatch/ReanimatedUIManager/latest/com/swmansion/reanimated/ReanimatedModule.java:107: error: method does not override or implement a method from a supertype
+    @Override
+    ^
+  /Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/reactNativeVersionPatch/BorderRadiiDrawableUtils/latest/com/swmansion/reanimated/BorderRadiiDrawableUtils.java:21: error: method resolve in class LengthPercentage cannot be applied to given types;
+      return length.resolve(bounds.width(), bounds.height()).toPixelFromDIP().getHorizontal();
+                   ^
+    required: float
+    found:    int,int
+    reason: actual and formal argument lists differ in length
+  Note: Some input files use or override a deprecated API.
+  Note: Recompile with -Xlint:deprecation for details.
+  Note: Some input files use unchecked or unsafe operations.
+  Note: Recompile with -Xlint:unchecked for details.
+  7 errors
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights.
+
+* Exception is:
+org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':react-native-reanimated:compileDebugJavaWithJavac'.
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.lambda$executeIfValid$1(ExecuteActionsTaskExecuter.java:130)
+	at org.gradle.internal.Try$Failure.ifSuccessfulOrElse(Try.java:293)
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:128)
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.execute(ExecuteActionsTaskExecuter.java:116)
+	at org.gradle.api.internal.tasks.execution.ProblemsTaskPathTrackingTaskExecuter.execute(ProblemsTaskPathTrackingTaskExecuter.java:40)
+	at org.gradle.api.internal.tasks.execution.FinalizePropertiesTaskExecuter.execute(FinalizePropertiesTaskExecuter.java:46)
+	at org.gradle.api.internal.tasks.execution.ResolveTaskExecutionModeExecuter.execute(ResolveTaskExecutionModeExecuter.java:51)
+	at org.gradle.api.internal.tasks.execution.SkipTaskWithNoActionsExecuter.execute(SkipTaskWithNoActionsExecuter.java:57)
+	at org.gradle.api.internal.tasks.execution.SkipOnlyIfTaskExecuter.execute(SkipOnlyIfTaskExecuter.java:74)
+	at org.gradle.api.internal.tasks.execution.CatchExceptionTaskExecuter.execute(CatchExceptionTaskExecuter.java:36)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.executeTask(EventFiringTaskExecuter.java:77)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:55)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:52)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter.execute(EventFiringTaskExecuter.java:52)
+	at org.gradle.execution.plan.LocalTaskNodeExecutor.execute(LocalTaskNodeExecutor.java:42)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:331)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:318)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.lambda$execute$0(DefaultTaskExecutionGraph.java:314)
+	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:85)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:314)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
+	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
+	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
+	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
+Caused by: org.gradle.api.internal.tasks.compile.CompilationFailedException: Compilation failed; see the compiler output below.
+/Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/reactNativeVersionPatch/ReanimatedUIManager/latest/com/swmansion/reanimated/ReanimatedModule.java:13: error: cannot find symbol
+import com.facebook.react.uimanager.UIManagerModuleListener;
+                                   ^
+  symbol:   class UIManagerModuleListener
+  location: package com.facebook.react.uimanager
+/Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/reactNativeVersionPatch/ReanimatedUIManager/latest/com/swmansion/reanimated/ReanimatedModule.java:20: error: cannot find symbol
+    implements LifecycleEventListener, UIManagerModuleListener, UIManagerListener {
+                                       ^
+  symbol: class UIManagerModuleListener
+/Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/main/java/com/swmansion/reanimated/ReanimatedPackage.java:72: error: cannot find symbol
+    Systrace.beginSection(Systrace.TRACE_TAG_REACT_JAVA_BRIDGE, "createUIManagerModule");
+                                  ^
+  symbol:   variable TRACE_TAG_REACT_JAVA_BRIDGE
+  location: class Systrace
+/Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/main/java/com/swmansion/reanimated/ReanimatedPackage.java:80: error: cannot find symbol
+      Systrace.endSection(Systrace.TRACE_TAG_REACT_JAVA_BRIDGE);
+                                  ^
+  symbol:   variable TRACE_TAG_REACT_JAVA_BRIDGE
+  location: class Systrace
+/Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/reactNativeVersionPatch/ReanimatedUIManager/latest/com/swmansion/reanimated/ReanimatedModule.java:83: error: cannot find symbol
+      uiManager.addUIManagerListener(this);
+               ^
+  symbol:   method addUIManagerListener(ReanimatedModule)
+  location: variable uiManager of type UIManagerModule
+/Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/reactNativeVersionPatch/ReanimatedUIManager/latest/com/swmansion/reanimated/ReanimatedModule.java:107: error: method does not override or implement a method from a supertype
+  @Override
+  ^
+/Users/mirror-admin/Documents/GitHub/MirrorBrain-Mobile/node_modules/react-native-reanimated/android/src/reactNativeVersionPatch/BorderRadiiDrawableUtils/latest/com/swmansion/reanimated/BorderRadiiDrawableUtils.java:21: error: method resolve in class LengthPercentage cannot be applied to given types;
+    return length.resolve(bounds.width(), bounds.height()).toPixelFromDIP().getHorizontal();
+                 ^
+  required: float
+  found:    int,int
+  reason: actual and formal argument lists differ in length
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+7 errors
+	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:89)
+	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:50)
+	at org.gradle.api.internal.tasks.compile.NormalizingJavaCompiler.delegateAndHandleErrors(NormalizingJavaCompiler.java:98)
+	at org.gradle.api.internal.tasks.compile.NormalizingJavaCompiler.execute(NormalizingJavaCompiler.java:52)
+	at org.gradle.api.internal.tasks.compile.NormalizingJavaCompiler.execute(NormalizingJavaCompiler.java:38)
+	at org.gradle.api.internal.tasks.compile.AnnotationProcessorDiscoveringCompiler.execute(AnnotationProcessorDiscoveringCompiler.java:52)
+	at org.gradle.api.internal.tasks.compile.AnnotationProcessorDiscoveringCompiler.execute(AnnotationProcessorDiscoveringCompiler.java:38)
+	at org.gradle.api.internal.tasks.compile.ModuleApplicationNameWritingCompiler.execute(ModuleApplicationNameWritingCompiler.java:46)
+	at org.gradle.api.internal.tasks.compile.ModuleApplicationNameWritingCompiler.execute(ModuleApplicationNameWritingCompiler.java:36)
+	at org.gradle.jvm.toolchain.internal.DefaultToolchainJavaCompiler.execute(DefaultToolchainJavaCompiler.java:57)
+	at org.gradle.api.tasks.compile.JavaCompile.lambda$createToolchainCompiler$3(JavaCompile.java:206)
+	at org.gradle.api.internal.tasks.compile.CleaningJavaCompiler.execute(CleaningJavaCompiler.java:53)
+	at org.gradle.api.internal.tasks.compile.incremental.IncrementalCompilerFactory.lambda$createRebuildAllCompiler$0(IncrementalCompilerFactory.java:55)
+	at org.gradle.api.internal.tasks.compile.incremental.SelectiveCompiler.execute(SelectiveCompiler.java:70)
+	at org.gradle.api.internal.tasks.compile.incremental.SelectiveCompiler.execute(SelectiveCompiler.java:44)
+	at org.gradle.api.internal.tasks.compile.incremental.IncrementalResultStoringCompiler.execute(IncrementalResultStoringCompiler.java:66)
+	at org.gradle.api.internal.tasks.compile.incremental.IncrementalResultStoringCompiler.execute(IncrementalResultStoringCompiler.java:52)
+	at org.gradle.api.internal.tasks.compile.CompileJavaBuildOperationReportingCompiler$1.call(CompileJavaBuildOperationReportingCompiler.java:64)
+	at org.gradle.api.internal.tasks.compile.CompileJavaBuildOperationReportingCompiler$1.call(CompileJavaBuildOperationReportingCompiler.java:48)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
+	at org.gradle.api.internal.tasks.compile.CompileJavaBuildOperationReportingCompiler.execute(CompileJavaBuildOperationReportingCompiler.java:48)
+	at org.gradle.api.tasks.compile.JavaCompile.performCompilation(JavaCompile.java:224)
+	at org.gradle.api.tasks.compile.JavaCompile.performIncrementalCompilation(JavaCompile.java:165)
+	at org.gradle.api.tasks.compile.JavaCompile.compile(JavaCompile.java:150)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at org.gradle.internal.reflect.JavaMethod.invoke(JavaMethod.java:125)
+	at org.gradle.api.internal.project.taskfactory.IncrementalTaskAction.doExecute(IncrementalTaskAction.java:45)
+	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.execute(StandardTaskAction.java:51)
+	at org.gradle.api.internal.project.taskfactory.IncrementalTaskAction.execute(IncrementalTaskAction.java:26)
+	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.execute(StandardTaskAction.java:29)
+	at org.gradle.api.internal.tasks.execution.TaskExecution$3.run(TaskExecution.java:244)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:30)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:27)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.run(DefaultBuildOperationRunner.java:48)
+	at org.gradle.api.internal.tasks.execution.TaskExecution.executeAction(TaskExecution.java:229)
+	at org.gradle.api.internal.tasks.execution.TaskExecution.executeActions(TaskExecution.java:212)
+	at org.gradle.api.internal.tasks.execution.TaskExecution.executeWithPreviousOutputFiles(TaskExecution.java:195)
+	at org.gradle.api.internal.tasks.execution.TaskExecution.execute(TaskExecution.java:162)
+	at org.gradle.internal.execution.steps.ExecuteStep.executeInternal(ExecuteStep.java:105)
+	at org.gradle.internal.execution.steps.ExecuteStep.access$000(ExecuteStep.java:44)
+	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:59)
+	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:56)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
+	at org.gradle.internal.execution.steps.ExecuteStep.execute(ExecuteStep.java:56)
+	at org.gradle.internal.execution.steps.ExecuteStep.execute(ExecuteStep.java:44)
+	at org.gradle.internal.execution.steps.CancelExecutionStep.execute(CancelExecutionStep.java:42)
+	at org.gradle.internal.execution.steps.TimeoutStep.executeWithoutTimeout(TimeoutStep.java:75)
+	at org.gradle.internal.execution.steps.TimeoutStep.execute(TimeoutStep.java:55)
+	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:50)
+	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:28)
+	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.execute(RemovePreviousOutputsStep.java:67)
+	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.execute(RemovePreviousOutputsStep.java:37)
+	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:61)
+	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:26)
+	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:69)
+	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:46)
+	at org.gradle.internal.execution.steps.ResolveInputChangesStep.execute(ResolveInputChangesStep.java:40)
+	at org.gradle.internal.execution.steps.ResolveInputChangesStep.execute(ResolveInputChangesStep.java:29)
+	at org.gradle.internal.execution.steps.BuildCacheStep.executeWithoutCache(BuildCacheStep.java:189)
+	at org.gradle.internal.execution.steps.BuildCacheStep.lambda$execute$1(BuildCacheStep.java:75)
+	at org.gradle.internal.Either$Right.fold(Either.java:175)
+	at org.gradle.internal.execution.caching.CachingState.fold(CachingState.java:62)
+	at org.gradle.internal.execution.steps.BuildCacheStep.execute(BuildCacheStep.java:73)
+	at org.gradle.internal.execution.steps.BuildCacheStep.execute(BuildCacheStep.java:48)
+	at org.gradle.internal.execution.steps.StoreExecutionStateStep.execute(StoreExecutionStateStep.java:46)
+	at org.gradle.internal.execution.steps.StoreExecutionStateStep.execute(StoreExecutionStateStep.java:35)
+	at org.gradle.internal.execution.steps.SkipUpToDateStep.executeBecause(SkipUpToDateStep.java:75)
+	at org.gradle.internal.execution.steps.SkipUpToDateStep.lambda$execute$2(SkipUpToDateStep.java:53)
+	at org.gradle.internal.execution.steps.SkipUpToDateStep.execute(SkipUpToDateStep.java:53)
+	at org.gradle.internal.execution.steps.SkipUpToDateStep.execute(SkipUpToDateStep.java:35)
+	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsFinishedStep.execute(MarkSnapshottingInputsFinishedStep.java:37)
+	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsFinishedStep.execute(MarkSnapshottingInputsFinishedStep.java:27)
+	at org.gradle.internal.execution.steps.ResolveIncrementalCachingStateStep.executeDelegate(ResolveIncrementalCachingStateStep.java:49)
+	at org.gradle.internal.execution.steps.ResolveIncrementalCachingStateStep.executeDelegate(ResolveIncrementalCachingStateStep.java:27)
+	at org.gradle.internal.execution.steps.AbstractResolveCachingStateStep.execute(AbstractResolveCachingStateStep.java:71)
+	at org.gradle.internal.execution.steps.AbstractResolveCachingStateStep.execute(AbstractResolveCachingStateStep.java:39)
+	at org.gradle.internal.execution.steps.ResolveChangesStep.execute(ResolveChangesStep.java:65)
+	at org.gradle.internal.execution.steps.ResolveChangesStep.execute(ResolveChangesStep.java:36)
+	at org.gradle.internal.execution.steps.ValidateStep.execute(ValidateStep.java:107)
+	at org.gradle.internal.execution.steps.ValidateStep.execute(ValidateStep.java:56)
+	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:64)
+	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:43)
+	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.executeWithNonEmptySources(AbstractSkipEmptyWorkStep.java:125)
+	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:61)
+	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:36)
+	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsStartedStep.execute(MarkSnapshottingInputsStartedStep.java:38)
+	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.execute(LoadPreviousExecutionStateStep.java:36)
+	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.execute(LoadPreviousExecutionStateStep.java:23)
+	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.execute(HandleStaleOutputsStep.java:75)
+	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.execute(HandleStaleOutputsStep.java:41)
+	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.lambda$execute$0(AssignMutableWorkspaceStep.java:35)
+	at org.gradle.api.internal.tasks.execution.TaskExecution$4.withWorkspace(TaskExecution.java:289)
+	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.execute(AssignMutableWorkspaceStep.java:31)
+	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.execute(AssignMutableWorkspaceStep.java:22)
+	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:40)
+	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:23)
+	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.lambda$execute$2(ExecuteWorkBuildOperationFiringStep.java:67)
+	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:67)
+	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:39)
+	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:46)
+	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:34)
+	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:48)
+	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:35)
+	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:61)
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:127)
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.execute(ExecuteActionsTaskExecuter.java:116)
+	at org.gradle.api.internal.tasks.execution.ProblemsTaskPathTrackingTaskExecuter.execute(ProblemsTaskPathTrackingTaskExecuter.java:40)
+	at org.gradle.api.internal.tasks.execution.FinalizePropertiesTaskExecuter.execute(FinalizePropertiesTaskExecuter.java:46)
+	at org.gradle.api.internal.tasks.execution.ResolveTaskExecutionModeExecuter.execute(ResolveTaskExecutionModeExecuter.java:51)
+	at org.gradle.api.internal.tasks.execution.SkipTaskWithNoActionsExecuter.execute(SkipTaskWithNoActionsExecuter.java:57)
+	at org.gradle.api.internal.tasks.execution.SkipOnlyIfTaskExecuter.execute(SkipOnlyIfTaskExecuter.java:74)
+	at org.gradle.api.internal.tasks.execution.CatchExceptionTaskExecuter.execute(CatchExceptionTaskExecuter.java:36)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.executeTask(EventFiringTaskExecuter.java:77)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:55)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:52)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter.execute(EventFiringTaskExecuter.java:52)
+	at org.gradle.execution.plan.LocalTaskNodeExecutor.execute(LocalTaskNodeExecutor.java:42)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:331)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:318)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.lambda$execute$0(DefaultTaskExecutionGraph.java:314)
+	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:85)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:314)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
+	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
+	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
+	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
+
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.13/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 1s
+151 actionable tasks: 1 executed, 150 up-to-date

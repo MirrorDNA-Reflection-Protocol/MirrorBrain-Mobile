@@ -93,18 +93,9 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
 
     // Voice state
     const [isRecording, setIsRecording] = useState(false);
-    const [recordingDuration, setRecordingDuration] = useState(0);
+    const [recordingText, setRecordingText] = useState('');
 
-    // Recording timer
-    useEffect(() => {
-        let interval: ReturnType<typeof setInterval>;
-        if (isRecording) {
-            interval = setInterval(() => {
-                setRecordingDuration(VoiceService.getRecordingDuration());
-            }, 1000);
-        }
-        return () => clearInterval(interval);
-    }, [isRecording]);
+
 
     const handleAction = (action: Action) => {
         if (!action.available) {
@@ -155,39 +146,31 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
 
     const handleVoiceCapture = async () => {
         if (isRecording) {
-            // Stop recording
+            // Stop listening
             setIsRecording(false);
-            const audioPath = await VoiceService.stopRecording();
+            await VoiceService.stopListening();
 
-            if (audioPath) {
-                Alert.alert(
-                    'Recording Stopped',
-                    'Transcription requires whisper.rn. Save audio file to vault?',
-                    [
-                        { text: 'Discard', style: 'cancel' },
-                        {
-                            text: 'Save Audio',
-                            onPress: async () => {
-                                await VaultService.saveCapture(
-                                    'voice',
-                                    `Voice recording - ${recordingDuration}s`,
-                                    `Voice - ${new Date().toLocaleTimeString()}`,
-                                    audioPath
-                                );
-                                Alert.alert('Saved', 'Voice recording saved to vault');
-                            }
-                        }
-                    ]
+            // Save if we have text
+            if (recordingText.trim()) {
+                await VaultService.saveCapture(
+                    'voice',
+                    recordingText,
+                    `Voice - ${new Date().toLocaleTimeString()}`
                 );
+                Alert.alert('Saved', 'Transcription saved to vault');
+                setRecordingText('');
             }
-            setRecordingDuration(0);
         } else {
-            // Start recording
-            const started = await VoiceService.startRecording();
+            // Start listening
+            setRecordingText('');
+            const started = await VoiceService.startListening((text, isFinal) => {
+                setRecordingText(text);
+            });
+
             if (started) {
                 setIsRecording(true);
             } else {
-                Alert.alert('Error', 'Failed to start recording. Check microphone permission.');
+                Alert.alert('Error', 'Failed to start microphone. Check permissions.');
             }
         }
     };
@@ -247,8 +230,8 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
                     onPress={handleVoiceCapture}
                 >
                     <View style={styles.recordingDot} />
-                    <Text style={styles.recordingText}>
-                        Recording... {recordingDuration}s — tap to stop
+                    <Text style={styles.recordingText} numberOfLines={1}>
+                        {recordingText || "Listening..."}
                     </Text>
                 </TouchableOpacity>
             )}

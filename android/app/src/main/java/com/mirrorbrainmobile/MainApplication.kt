@@ -23,5 +23,13 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     loadReactNative(this)
+    
+    // Start Chrysalis Agent Core
+    val intent = android.content.Intent(this, com.mirrorbrainmobile.service.AgentService::class.java)
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+        startForegroundService(intent)
+    } else {
+        startService(intent)
+    }
   }
 }

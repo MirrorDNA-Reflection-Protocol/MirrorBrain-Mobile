@@ -91,11 +91,16 @@ export const NowScreen: React.FC<NowScreenProps> = ({
     }, []);
 
     // Subtle pulse animation
+    // Subtle pulse animation (Breathing)
     useEffect(() => {
         const pulse = Animated.loop(
             Animated.sequence([
-                Animated.timing(pulseAnim, { toValue: 1.1, duration: 2000, useNativeDriver: true }),
-                Animated.timing(pulseAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
+                Animated.parallel([
+                    Animated.timing(pulseAnim, { toValue: 1.05, duration: 3000, useNativeDriver: true }), // Slower, subtler scale
+                ]),
+                Animated.parallel([
+                    Animated.timing(pulseAnim, { toValue: 1, duration: 3000, useNativeDriver: true }),
+                ]),
             ])
         );
         pulse.start();
