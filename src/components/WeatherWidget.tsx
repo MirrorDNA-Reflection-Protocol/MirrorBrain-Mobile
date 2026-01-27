@@ -1,22 +1,80 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { GlassView } from './GlassView';
 import { colors, typography, spacing } from '../theme';
+import { WeatherService } from '../services';
+
+interface WeatherData {
+    temp: number;
+    condition: string;
+    high: number;
+    low: number;
+    location: string;
+    icon: string;
+}
 
 export const WeatherWidget: React.FC = () => {
+    const [weather, setWeather] = useState<WeatherData>({
+        temp: 28,
+        condition: 'Partly Cloudy',
+        high: 32,
+        low: 24,
+        location: 'Goa',
+        icon: '☀️'
+    });
+
+    useEffect(() => {
+        loadWeather();
+    }, []);
+
+    const loadWeather = async () => {
+        try {
+            const data = await WeatherService.getWeather();
+            if (data) {
+                setWeather({
+                    temp: Math.round(data.temperature),
+                    condition: WeatherService.getConditionText(data.condition),
+                    high: Math.round(data.temperature + 4),
+                    low: Math.round(data.temperature - 4),
+                    location: data.location || 'Goa',
+                    icon: WeatherService.getIcon(data.condition)
+                });
+            }
+        } catch (error) {
+            console.log('Weather: Using cached data');
+        }
+    };
+
+    const getWeatherIcon = (condition: string): string => {
+        const lower = condition.toLowerCase();
+        if (lower.includes('sun') || lower.includes('clear')) return '☀️';
+        if (lower.includes('cloud')) return '⛅';
+        if (lower.includes('rain')) return '🌧️';
+        if (lower.includes('storm')) return '⛈️';
+        if (lower.includes('snow')) return '❄️';
+        if (lower.includes('fog') || lower.includes('mist')) return '🌫️';
+        return '🌤️';
+    };
+
     return (
-        <GlassView style={styles.container}>
+        <GlassView style={styles.container} variant="prominent">
             <View style={styles.content}>
-                <Text style={styles.location}>San Francisco</Text>
-                <Text style={styles.temp}>12°</Text>
-                <View style={styles.conditionRow}>
-                    <Text style={styles.icon}>☁️</Text>
-                    <View>
-                        <Text style={styles.condition}>Partly Cloudy</Text>
-                        <Text style={styles.range}>H:14° L:10°</Text>
+                {/* Location */}
+                <View style={styles.header}>
+                    <Text style={styles.location}>{weather.location}</Text>
+                </View>
+
+                {/* Large Temperature */}
+                <Text style={styles.temp}>{weather.temp}°</Text>
+
+                {/* Condition Row */}
+                <View style={styles.bottomRow}>
+                    <Text style={styles.icon}>{weather.icon}</Text>
+                    <View style={styles.conditionInfo}>
+                        <Text style={styles.condition}>{weather.condition}</Text>
+                        <Text style={styles.range}>H:{weather.high}° L:{weather.low}°</Text>
                     </View>
                 </View>
-                <Text style={styles.source}>Weather</Text>
             </View>
         </GlassView>
     );
@@ -24,47 +82,52 @@ export const WeatherWidget: React.FC = () => {
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
-        aspectRatio: 1, // Square
-        marginRight: spacing.md,
+        width: 160,
+        height: 160,
     },
     content: {
         padding: spacing.md,
         flex: 1,
         justifyContent: 'space-between',
     },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
     location: {
-        ...typography.labelSmall,
-        color: colors.glass.text,
-        textTransform: 'uppercase',
+        fontSize: 13,
+        fontWeight: '600',
+        color: 'rgba(255, 255, 255, 0.9)',
+        letterSpacing: 0.5,
     },
     temp: {
-        fontSize: 48,
+        fontSize: 52,
         fontWeight: '200',
-        color: colors.glass.text,
-        marginVertical: spacing.xs,
+        color: '#FFFFFF',
+        marginTop: -4,
+        includeFontPadding: false,
     },
-    conditionRow: {
+    bottomRow: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     icon: {
-        fontSize: 24,
+        fontSize: 26,
         marginRight: spacing.sm,
     },
+    conditionInfo: {
+        flex: 1,
+    },
     condition: {
-        ...typography.labelSmall,
-        color: colors.glass.text,
+        fontSize: 12,
         fontWeight: '600',
+        color: 'rgba(255, 255, 255, 0.9)',
     },
     range: {
-        ...typography.labelSmall,
-        color: colors.glass.textSecondary,
-    },
-    source: {
-        ...typography.labelSmall,
-        color: colors.glass.textSecondary,
-        textAlign: 'right',
-        marginTop: spacing.sm,
+        fontSize: 11,
+        color: 'rgba(255, 255, 255, 0.6)',
+        marginTop: 2,
     },
 });
+

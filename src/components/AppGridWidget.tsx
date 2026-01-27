@@ -1,41 +1,59 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { GlassView } from './GlassView';
-import { colors, typography, spacing } from '../theme';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { colors, spacing } from '../theme';
+import { AppLauncherService } from '../services';
+import { HapticService } from '../services';
 
 interface AppShortcut {
     id: string;
     label: string;
-    icon: string; // Emoji for now, could be Image
+    icon: string;
     color: string;
+    packageName?: string;
 }
 
 const SHORTCUTS: AppShortcut[] = [
-    { id: 'focus', label: 'Focus', icon: '🎯', color: '#EF4444' },
-    { id: 'work', label: 'Work', icon: '💼', color: '#3B82F6' },
-    { id: 'photos', label: 'Photos', icon: '🌸', color: '#EC4899' },
-    { id: 'mail', label: 'Mail', icon: '✉️', color: '#10B981' },
+    { id: 'vault', label: 'Vault', icon: '🗄️', color: '#6366F1', packageName: 'md.obsidian' },
+    { id: 'camera', label: 'Camera', icon: '📷', color: '#3B82F6', packageName: 'com.google.android.camera' },
+    { id: 'files', label: 'Files', icon: '📁', color: '#10B981', packageName: 'com.google.android.apps.nbu.files' },
+    { id: 'notes', label: 'Notes', icon: '📝', color: '#F59E0B', packageName: 'com.google.android.keep' },
 ];
 
 export const AppGridWidget: React.FC = () => {
+    const handlePress = async (app: AppShortcut) => {
+        HapticService.tap();
+        if (app.packageName) {
+            try {
+                await AppLauncherService.launchApp(app.packageName);
+            } catch (error) {
+                console.log(`Could not launch ${app.label}`);
+            }
+        }
+    };
+
     return (
         <View style={styles.container}>
             <View style={styles.row}>
                 {SHORTCUTS.slice(0, 2).map((app) => (
-                    <AppIcon key={app.id} app={app} />
+                    <AppIcon key={app.id} app={app} onPress={() => handlePress(app)} />
                 ))}
             </View>
             <View style={styles.row}>
                 {SHORTCUTS.slice(2, 4).map((app) => (
-                    <AppIcon key={app.id} app={app} />
+                    <AppIcon key={app.id} app={app} onPress={() => handlePress(app)} />
                 ))}
             </View>
         </View>
     );
 };
 
-const AppIcon: React.FC<{ app: AppShortcut }> = ({ app }) => (
-    <TouchableOpacity style={styles.appItem}>
+interface AppIconProps {
+    app: AppShortcut;
+    onPress: () => void;
+}
+
+const AppIcon: React.FC<AppIconProps> = ({ app, onPress }) => (
+    <TouchableOpacity style={styles.appItem} onPress={onPress} activeOpacity={0.7}>
         <View style={[styles.iconContainer, { backgroundColor: app.color }]}>
             <Text style={styles.icon}>{app.icon}</Text>
         </View>
@@ -46,38 +64,45 @@ const AppIcon: React.FC<{ app: AppShortcut }> = ({ app }) => (
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        // No glass wrapper, icons float on background
         justifyContent: 'center',
-        gap: spacing.md,
+        gap: spacing.sm,
     },
     row: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
+        justifyContent: 'space-evenly',
+        gap: spacing.sm,
     },
     appItem: {
         alignItems: 'center',
-        width: 60,
+        width: 68,
     },
     iconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 24, // Circle
+        width: 54,
+        height: 54,
+        borderRadius: 14, // Rounded square like iOS
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: spacing.xs,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 5,
+        marginBottom: 6,
+        ...Platform.select({
+            android: {
+                elevation: 6,
+            },
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.25,
+                shadowRadius: 5,
+            },
+        }),
     },
     icon: {
-        fontSize: 24,
+        fontSize: 26,
     },
     label: {
-        ...typography.labelSmall,
-        color: colors.glass.text,
-        fontSize: 10,
-        fontWeight: '600',
+        fontSize: 11,
+        fontWeight: '500',
+        color: 'rgba(255, 255, 255, 0.85)',
+        textAlign: 'center',
     },
 });
+

@@ -12,7 +12,15 @@
  */
 
 import RNFS from 'react-native-fs';
+import { PermissionsAndroid, Platform } from 'react-native';
 import type { VaultItem, CaptureItem, SessionClosure, ChatMessage } from '../types';
+
+// External vault paths on Pixel
+export const EXTERNAL_VAULT_PATHS = {
+    PIXEL_VAULT: '/storage/emulated/0/Pixel Vault',
+    OBSIDIAN: '/storage/emulated/0/Obsidian',
+    CHRYSALIS: '/storage/emulated/0/Chrysalis',
+} as const;
 
 // Storage paths matching spec Part XII
 // Using DocumentDirectoryPath for Android 13+ compatibility (scoped storage)
@@ -75,7 +83,9 @@ interface StoredSession {
 
 class VaultServiceClass {
     private rootPath: string = STORAGE_PATHS.ROOT;
+    private externalVaultPath: string | null = null;
     private initialized: boolean = false;
+    private hasExternalAccess: boolean = false;
 
     /**
      * Initialize storage directories
@@ -472,6 +482,116 @@ class VaultServiceClass {
         } catch {
             return true; // Assume OK if check fails
         }
+    }
+
+    /**
+     * Request external storage access for Pixel Vault
+     */
+    async requestExternalAccess(): Promise<boolean> {
+        if (Platform.OS !== 'android') return false;
+
+        try {
+            // Check if external vault exists
+            const pixelVaultExists = await RNFS.exists(EXTERNAL_VAULT_PATHS.PIXEL_VAULT);
+            const obsidianExists = await RNFS.exists(EXTERNAL_VAULT_PATHS.OBSIDIAN);
+
+            if (pixelVaultExists) {
+                this.externalVaultPath = EXTERNAL_VAULT_PATHS.PIXEL_VAULT;
+                this.hasExternalAccess = true;
+            } else if (obsidianExists) {
+                this.externalVaultPath = EXTERNAL_VAULT_PATHS.OBSIDIAN;
+                this.hasExternalAccess = true;
+            }
+
+            console.log('External vault path:', this.externalVaultPath);
+            return this.hasExternalAccess;
+        } catch (error) {
+            console.error('Failed to access external vault:', error);
+            return false;
+        }
+    }
+
+    /**
+     * List files from external Pixel Vault
+     */
+    async listExternalVaultFiles(subPath: string = ''): Promise<VaultItem[]> {
+        if (!this.externalVaultPath) {
+            await this.requestExternalAccess();
+        }
+
+        if (!this.externalVaultPath) {
+            return [];
+        }
+
+        const items: VaultItem[] = [];
+        const targetPath = subPath
+            ? `${this.externalVaultPath}/${subPath}`
+            : this.externalVaultPath;
+
+        try {
+            const exists = await RNFS.exists(targetPath);
+            if (!exists) return [];
+
+            const files = await RNFS.readDir(targetPath);
+
+            for (const file of files) {
+                // Skip hidden files and system folders
+                if (file.name.startsWith('.')) continue;
+
+                items.push({
+                    id: file.path,
+                    type: file.isDirectory() ? 'capture' : 'session',
+                    title: file.name,
+                    content: file.isDirectory()
+                        ? `📁 Folder`
+                        : `${Math.round(file.size / 1024)} KB`,
+                    createdAt: new Date(file.mtime || Date.now()),
+                    updatedAt: new Date(file.mtime || Date.now()),
+                    tags: file.isDirectory() ? ['folder'] : [file.name.split('.').pop() || 'file'],
+                });
+            }
+
+            // Sort folders first, then by name
+            items.sort((a, b) => {
+                if (a.tags?.includes('folder') && !b.tags?.includes('folder')) return -1;
+                if (!a.tags?.includes('folder') && b.tags?.includes('folder')) return 1;
+                return a.title.localeCompare(b.title);
+            });
+
+            return items;
+        } catch (error) {
+            console.error('Failed to list external vault:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Read file content from external vault
+     */
+    async readExternalFile(filePath: string): Promise<string | null> {
+        try {
+            const exists = await RNFS.exists(filePath);
+            if (!exists) return null;
+
+            return await RNFS.readFile(filePath, 'utf8');
+        } catch (error) {
+            console.error('Failed to read external file:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Get external vault path
+     */
+    getExternalVaultPath(): string | null {
+        return this.externalVaultPath;
+    }
+
+    /**
+     * Check if external vault is connected
+     */
+    hasExternalVault(): boolean {
+        return this.hasExternalAccess;
     }
 }
 
