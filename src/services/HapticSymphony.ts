@@ -23,11 +23,15 @@ export const HapticSymphony = {
     // Used when a difficult decision is resolved.
     shatter: async () => {
         ReactNativeHapticFeedback.trigger('impactHeavy', options);
-        await new Promise(r => setTimeout(r, 50));
-        ReactNativeHapticFeedback.trigger('impactMedium', options);
-        await new Promise(r => setTimeout(r, 50));
+        await new Promise(r => setTimeout(() => r(null), 100)); // Systole
+        // Diastole (weaker)
         ReactNativeHapticFeedback.trigger('impactLight', options);
-        await new Promise(r => setTimeout(r, 50));
+        await new Promise(r => setTimeout(() => r(null), 50));
+        // Pause
+        await new Promise(r => setTimeout(() => r(null), 50));
+        // Systole
+        ReactNativeHapticFeedback.trigger('impactMedium', options);
+        await new Promise(r => setTimeout(() => r(null), 50));
         ReactNativeHapticFeedback.trigger('notificationSuccess', options);
     },
 

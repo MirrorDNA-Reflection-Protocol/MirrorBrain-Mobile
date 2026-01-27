@@ -6,6 +6,7 @@
  */
 
 import { Linking, Platform, Alert } from 'react-native';
+// @ts-ignore
 import IntentLauncher from 'react-native-intent-launcher';
 
 // Kiwix Android Package ID

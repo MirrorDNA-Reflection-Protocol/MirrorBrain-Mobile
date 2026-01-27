@@ -16,9 +16,9 @@ import {
     FlatList,
     StatusBar,
     SafeAreaView,
-    TouchableOpacity,
     Animated,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { NowScreen, AskScreen, VaultScreen, ActionsScreen } from './screens';
 import { IdentityImportModal } from './components';
 import { VaultService, IdentityService } from './services';
@@ -136,94 +136,101 @@ export const App: React.FC = () => {
     const currentIndex = panels.findIndex(p => p.key === currentPanel);
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar
-                barStyle="light-content"
-                backgroundColor={colors.background}
-                translucent={false}
-            />
-
-            {/* Top navigation bar */}
-            <View style={styles.navBar}>
-                {panels.map((panel, index) => (
-                    <TouchableOpacity
-                        key={panel.key}
-                        style={[
-                            styles.navItem,
-                            currentPanel === panel.key && styles.navItemActive,
-                        ]}
-                        onPress={() => scrollToPanel(index)}
-                    >
-                        <Text style={[
-                            styles.navGlyph,
-                            currentPanel === panel.key && styles.navGlyphActive,
-                        ]}>
-                            {panel.glyph}
-                        </Text>
-                        <Text style={[
-                            styles.navLabel,
-                            currentPanel === panel.key && styles.navLabelActive,
-                        ]}>
-                            {panel.label}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            {/* Progress indicator */}
-            <View style={styles.progressContainer}>
-                <View
-                    style={[
-                        styles.progressBar,
-                        { width: `${((currentIndex + 1) / panels.length) * 100}%` }
-                    ]}
+        <LinearGradient
+            colors={[colors.gradientStart, colors.gradientEnd]}
+            style={styles.container}
+        >
+            <SafeAreaView style={styles.contentContainer}>
+                <StatusBar
+                    barStyle="light-content"
+                    backgroundColor="transparent"
+                    translucent={true}
                 />
-            </View>
 
-            {/* Horizontal panel navigation */}
-            <FlatList
-                ref={flatListRef}
-                data={panels}
-                keyExtractor={item => item.key}
-                renderItem={renderPanel}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                bounces={false}
-                onViewableItemsChanged={handleViewableItemsChanged}
-                viewabilityConfig={viewabilityConfig}
-                getItemLayout={(_, index) => ({
-                    length: SCREEN_WIDTH,
-                    offset: SCREEN_WIDTH * index,
-                    index,
-                })}
-                initialScrollIndex={0}
-                decelerationRate="fast"
-                snapToInterval={SCREEN_WIDTH}
-                snapToAlignment="start"
-            />
-
-            {/* Swipe hint for first-time users */}
-            {currentIndex === 0 && (
-                <View style={styles.swipeHint}>
-                    <Text style={styles.swipeHintText}>← Swipe to explore →</Text>
+                {/* Top navigation bar */}
+                <View style={styles.navBar}>
+                    {panels.map((panel, index) => (
+                        <TouchableOpacity
+                            key={panel.key}
+                            style={[
+                                styles.navItem,
+                                currentPanel === panel.key && styles.navItemActive,
+                            ]}
+                            onPress={() => scrollToPanel(index)}
+                        >
+                            <Text style={[
+                                styles.navGlyph,
+                                currentPanel === panel.key && styles.navGlyphActive,
+                            ]}>
+                                {panel.glyph}
+                            </Text>
+                            <Text style={[
+                                styles.navLabel,
+                                currentPanel === panel.key && styles.navLabelActive,
+                            ]}>
+                                {panel.label}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
                 </View>
-            )}
 
-            {/* Identity import modal */}
-            <IdentityImportModal
-                visible={showIdentityModal}
-                onClose={() => setShowIdentityModal(false)}
-                onImportComplete={handleIdentityImported}
-            />
-        </SafeAreaView>
+                {/* Progress indicator */}
+                <View style={styles.progressContainer}>
+                    <View
+                        style={[
+                            styles.progressBar,
+                            { width: `${((currentIndex + 1) / panels.length) * 100}%` }
+                        ]}
+                    />
+                </View>
+
+                {/* Horizontal panel navigation */}
+                <FlatList
+                    ref={flatListRef}
+                    data={panels}
+                    keyExtractor={item => item.key}
+                    renderItem={renderPanel}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    bounces={false}
+                    onViewableItemsChanged={handleViewableItemsChanged}
+                    viewabilityConfig={viewabilityConfig}
+                    getItemLayout={(_, index) => ({
+                        length: SCREEN_WIDTH,
+                        offset: SCREEN_WIDTH * index,
+                        index,
+                    })}
+                    initialScrollIndex={0}
+                    decelerationRate="fast"
+                    snapToInterval={SCREEN_WIDTH}
+                    snapToAlignment="start"
+                />
+
+                {/* Swipe hint for first-time users */}
+                {currentIndex === 0 && (
+                    <View style={styles.swipeHint}>
+                        <Text style={styles.swipeHintText}>← Swipe to explore →</Text>
+                    </View>
+                )}
+
+                {/* Identity import modal */}
+                <IdentityImportModal
+                    visible={showIdentityModal}
+                    onClose={() => setShowIdentityModal(false)}
+                    onImportComplete={handleIdentityImported}
+                />
+            </SafeAreaView>
+        </LinearGradient>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+    },
+    contentContainer: {
+        flex: 1,
     },
     panelContainer: {
         width: SCREEN_WIDTH,
@@ -233,11 +240,11 @@ const styles = StyleSheet.create({
     // Navigation bar
     navBar: {
         flexDirection: 'row',
-        backgroundColor: colors.surface,
+        backgroundColor: colors.glass.background, // Glass effect
+        borderColor: colors.glass.border,
+        borderBottomWidth: 1,
         paddingVertical: spacing.sm,
         paddingHorizontal: spacing.xs,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.surfaceElevated,
     },
     navItem: {
         flex: 1,

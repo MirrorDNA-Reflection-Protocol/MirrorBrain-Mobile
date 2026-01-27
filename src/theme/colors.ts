@@ -38,6 +38,18 @@ export const colors = {
     // Overlay
     overlay: 'rgba(0, 0, 0, 0.7)',
     overlayLight: 'rgba(255, 255, 255, 0.05)',
+
+    // Glassmorphism
+    glass: {
+        background: 'rgba(30, 30, 40, 0.4)',  // Semi-transparent dark
+        border: 'rgba(255, 255, 255, 0.1)',    // Subtle white border
+        text: 'rgba(255, 255, 255, 0.9)',
+        textSecondary: 'rgba(255, 255, 255, 0.6)',
+    },
+
+    // Gradients
+    gradientStart: '#1A1A2E',
+    gradientEnd: '#16213E',
 } as const;
 
 // Gradient definitions for accent
