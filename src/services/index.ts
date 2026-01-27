@@ -21,3 +21,5 @@ export * from './HapticSymphony';
 export { OrchestratorService, type Tool, type ToolResult, type OrchestrationResult } from './orchestrator.service';
 export { registerDeviceTools, getRegisteredToolNames } from './device.tools';
 export { A2ABridge, type DeviceIdentity, type RemoteDevice } from './a2a.bridge';
+export { SearchService, type SearchResult, type SearchResponse } from './search.service';
+

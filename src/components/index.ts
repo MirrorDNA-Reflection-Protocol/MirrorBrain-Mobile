@@ -6,3 +6,6 @@ export { IdentityImportModal } from './IdentityImportModal';
 export { GlassView } from './GlassView';
 export { WeatherWidget } from './WeatherWidget';
 export { AppGridWidget } from './AppGridWidget';
+export { BrowserPane } from './BrowserPane';
+export { SearchResultCard } from './SearchResultCard';
+

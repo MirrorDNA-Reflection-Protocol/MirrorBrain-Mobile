@@ -21,7 +21,9 @@ import {
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
 import { useLLM } from '../hooks';
-import { VaultService, IdentityService, HapticSymphony, VoiceService } from '../services';
+import { VaultService, IdentityService, HapticSymphony, VoiceService, SearchService } from '../services';
+import type { SearchResult, SearchResponse } from '../services';
+import { BrowserPane, SearchResultCard } from '../components';
 import type { AskMode, ChatMessage, SessionClosure } from '../types';
 
 // System prompt for MirrorMesh
@@ -57,6 +59,11 @@ export const AskScreen: React.FC<AskScreenProps> = ({
 
     // Voice State
     const [isListening, setIsListening] = useState(false);
+
+    // Search/Browse State
+    const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [browserUrl, setBrowserUrl] = useState<string | null>(null);
 
     const {
         isModelLoaded,
@@ -193,13 +200,34 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                 timestamp: new Date(),
             };
             setMessages([...newMessages, responseMessage]);
-        } else {
-            const responseMessage: ChatMessage = {
-                role: 'assistant',
-                content: 'Online search requires network access.',
-                timestamp: new Date(),
-            };
-            setMessages([...newMessages, responseMessage]);
+        } else if (mode === 'Online') {
+            // Web Search Mode
+            setIsSearching(true);
+            try {
+                const searchResponse = await SearchService.search(input.trim(), 5);
+                setSearchResults(searchResponse.results);
+
+                // Create summary message
+                const summary = searchResponse.results.length > 0
+                    ? `Found ${searchResponse.results.length} results for "${input.trim()}":`
+                    : 'No results found.';
+
+                const responseMessage: ChatMessage = {
+                    role: 'assistant',
+                    content: summary,
+                    timestamp: new Date(),
+                };
+                setMessages([...newMessages, responseMessage]);
+            } catch (error) {
+                const errorMessage: ChatMessage = {
+                    role: 'assistant',
+                    content: 'Search failed. Please try again.',
+                    timestamp: new Date(),
+                };
+                setMessages([...newMessages, errorMessage]);
+            } finally {
+                setIsSearching(false);
+            }
         }
     };
 
@@ -222,7 +250,7 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                 closure = {
                     type: 'decide',
                     decision: inputText || 'Decision made',
-                    rationale: messages.length > 0 
+                    rationale: messages.length > 0
                         ? messages[messages.length - 1].content.slice(0, 200)
                         : 'Based on conversation',
                 };
@@ -318,7 +346,7 @@ export const AskScreen: React.FC<AskScreenProps> = ({
             <View style={styles.modeChips}>
                 <ModeChip label="MirrorMesh" active={mode === 'MirrorMesh'} onPress={() => handleModeChange('MirrorMesh')} />
                 <ModeChip label="Vault" active={mode === 'Vault'} onPress={() => handleModeChange('Vault')} />
-                <ModeChip label="Online" active={mode === 'Online'} onPress={() => handleModeChange('Online')} indicator={isOnline} />
+                <ModeChip label="Search" active={mode === 'Online'} onPress={() => handleModeChange('Online')} indicator={mode === 'Online'} />
             </View>
 
             {/* Model warning */}
@@ -340,7 +368,7 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                         <Text style={styles.emptyPrompt}>
                             {mode === 'MirrorMesh' ? "What are you trying to decide, build, or understand?"
                                 : mode === 'Vault' ? "Search your vault..."
-                                : "Search the web..."}
+                                    : "Search the web..."}
                         </Text>
                         {identityLoaded && (
                             <Text style={styles.identityIndicator}>{glyphs.truth} Identity loaded</Text>
@@ -361,6 +389,27 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                     <View style={styles.streamingIndicator}>
                         <ActivityIndicator size="small" color={colors.accentPrimary} />
                         <Text style={styles.streamingText}>Thinking...</Text>
+                    </View>
+                )}
+
+                {/* Search Results with Citations */}
+                {mode === 'Online' && searchResults.length > 0 && (
+                    <View style={styles.searchResults}>
+                        {searchResults.map((result, index) => (
+                            <SearchResultCard
+                                key={result.url}
+                                result={result}
+                                index={index}
+                                onPress={(url) => setBrowserUrl(url)}
+                            />
+                        ))}
+                    </View>
+                )}
+
+                {isSearching && (
+                    <View style={styles.streamingIndicator}>
+                        <ActivityIndicator size="small" color={colors.accentPrimary} />
+                        <Text style={styles.streamingText}>Searching the web...</Text>
                     </View>
                 )}
             </ScrollView>
@@ -419,10 +468,10 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                 <View style={styles.closureModalOverlay}>
                     <View style={styles.closureModalContent}>
                         <Text style={styles.closureModalTitle}>
-                            {closureType === 'decide' ? '△ Decide' 
+                            {closureType === 'decide' ? '△ Decide'
                                 : closureType === 'defer' ? '⏸ Defer'
-                                : closureType === 'next' ? '→ Next Action'
-                                : '◯ Pause'}
+                                    : closureType === 'next' ? '→ Next Action'
+                                        : '◯ Pause'}
                         </Text>
                         <Text style={styles.closureModalPrompt}>{getClosurePrompt()}</Text>
                         <TextInput
@@ -493,6 +542,16 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                     </View>
                 </View>
             </Modal>
+
+            {/* Browser Pane Modal */}
+            {browserUrl && (
+                <Modal visible={true} animationType="slide" onRequestClose={() => setBrowserUrl(null)}>
+                    <BrowserPane
+                        url={browserUrl}
+                        onClose={() => setBrowserUrl(null)}
+                    />
+                </Modal>
+            )}
         </KeyboardAvoidingView>
     );
 };
@@ -540,7 +599,7 @@ const getPlaceholder = (mode: AskMode): string => {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    
+
     // Online banner
     onlineBanner: { backgroundColor: colors.online, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, alignItems: 'center' },
     onlineBannerText: { ...typography.labelMedium, color: colors.background },
@@ -635,6 +694,9 @@ const styles = StyleSheet.create({
     progressText: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, textAlign: 'center', lineHeight: 24, ...typography.labelSmall, color: colors.textPrimary },
     loadingContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: spacing.md, gap: spacing.sm },
     loadingText: { ...typography.labelSmall, color: colors.textMuted },
+
+    // Search Results
+    searchResults: { marginTop: spacing.md },
 });
 
 export default AskScreen;
