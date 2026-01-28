@@ -24,16 +24,21 @@ class MainApplication : Application(), ReactApplication {
     super.onCreate()
     loadReactNative(this)
     
-    // Start Chrysalis Agent Core (optional - may fail on Android 12+ without user interaction)
-    try {
-        val intent = android.content.Intent(this, com.mirrorbrainmobile.service.AgentService::class.java)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
-    } catch (e: Exception) {
-        android.util.Log.w("MainApplication", "AgentService start deferred: ${e.message}")
-    }
+    // DISABLED: AgentService auto-start removed.
+    // The dataSync foreground service type crashes after ~6 hours on Android 15
+    // (ForegroundServiceDidNotStartInTimeException). All agent orchestration now
+    // runs in JS via OrchestratorService. AgentService class retained for future
+    // native agent work (e.g., background sync with WorkManager).
+    //
+    // try {
+    //     val intent = android.content.Intent(this, com.mirrorbrainmobile.service.AgentService::class.java)
+    //     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+    //         startForegroundService(intent)
+    //     } else {
+    //         startService(intent)
+    //     }
+    // } catch (e: Exception) {
+    //     android.util.Log.w("MainApplication", "AgentService start deferred: ${e.message}")
+    // }
   }
 }

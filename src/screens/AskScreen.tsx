@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
 import { useLLM } from '../hooks';
-import { VaultService, IdentityService, HapticSymphony, VoiceService, SearchService } from '../services';
+import { VaultService, IdentityService, HapticSymphony, VoiceService, SearchService, OrchestratorService } from '../services';
 import type { SearchResult, MemorySpark } from '../services';
 import { BrowserPane, SearchResultCard } from '../components';
 import { RefineButton } from '../components/RefineButton';
@@ -58,6 +58,10 @@ export const AskScreen: React.FC<AskScreenProps> = ({
     const [showClosureModal, setShowClosureModal] = useState(false);
     const [closureType, setClosureType] = useState<SessionClosure['type'] | null>(null);
     const [closureInput, setClosureInput] = useState('');
+
+    // Agent orchestrator state
+    const [isAgentRunning, setIsAgentRunning] = useState(false);
+    const [agentStatus, setAgentStatus] = useState('');
 
     // Voice State
     const [isListening, setIsListening] = useState(false);
@@ -103,6 +107,11 @@ export const AskScreen: React.FC<AskScreenProps> = ({
         setIsListening(false);
     };
 
+    // Sync network status to orchestrator
+    useEffect(() => {
+        OrchestratorService.setNetworkStatus(isOnline);
+    }, [isOnline]);
+
     // Check for model on mount only
     useEffect(() => {
         const checkInitialModel = async () => {
@@ -125,10 +134,10 @@ export const AskScreen: React.FC<AskScreenProps> = ({
         loadSpark();
     }, []);
 
-    // Haptic Heartbeat during generation
+    // Haptic Heartbeat during generation or agent run
     useEffect(() => {
         let heartbeatInterval: ReturnType<typeof setTimeout> | null = null;
-        if (isGenerating) {
+        if (isGenerating || isAgentRunning) {
             HapticSymphony.heartbeat();
             heartbeatInterval = setInterval(() => {
                 HapticSymphony.heartbeat();
@@ -137,7 +146,7 @@ export const AskScreen: React.FC<AskScreenProps> = ({
         return () => {
             if (heartbeatInterval) clearInterval(heartbeatInterval);
         };
-    }, [isGenerating]);
+    }, [isGenerating, isAgentRunning]);
 
     const handleModeChange = (newMode: AskMode) => {
         setMode(newMode);
@@ -175,48 +184,81 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                 return;
             }
 
-            let systemPrompt = MIRRORMESH_SYSTEM_PROMPT;
+            // Build system prompt prefix with identity + RAG context
+            let systemPromptPrefix = MIRRORMESH_SYSTEM_PROMPT;
 
             // 1. Identity Context
             if (identityLoaded) {
                 const identityContext = IdentityService.getContext();
                 if (identityContext) {
-                    systemPrompt += `\n\nUser Identity:\n${identityContext}`;
+                    systemPromptPrefix += `\n\nUser Identity:\n${identityContext}`;
                 }
             }
 
             // 2. RAG Context (The "Mind" Integration)
-            // Silently search vault for relevant memories
             try {
-                const relevantNotes = await VaultService.search(input.trim());
+                const relevantNotes = await VaultService.search(userMessage.content);
                 if (relevantNotes.length > 0) {
-                    // Take top 3 most relevant
                     const topContext = relevantNotes.slice(0, 3).map(n =>
                         `[Note: ${n.title}]\n${n.content.slice(0, 300)}...`
                     ).join('\n\n');
 
-                    systemPrompt += `\n\nRELEVANT MEMORIES FROM VAULT:\n${topContext}\n\n(Use these memories to ground your answer in the user's reality. If they contradict general knowledge, prefer the memories.)`;
+                    systemPromptPrefix += `\n\nRELEVANT MEMORIES FROM VAULT:\n${topContext}\n\n(Use these memories to ground your answer in the user's reality. If they contradict general knowledge, prefer the memories.)`;
                     console.log('[RAG] Injected context tokens');
                 }
             } catch {
                 // No action needed if RAG fails, just proceed without context
             }
 
-            const result = await chat(
-                newMessages,
-                systemPrompt,
-                (token) => {
-                    setStreamingText(prev => prev + token);
-                }
-            );
+            // Run via OrchestratorService (ReAct agent loop with tools)
+            setIsAgentRunning(true);
+            setAgentStatus('Thinking...');
 
-            if (result) {
+            // Friendly tool name mapping for UI
+            const toolDisplayNames: Record<string, string> = {
+                get_battery: 'Checking battery...',
+                vibrate: 'Sending haptic...',
+                open_app: 'Opening app...',
+                list_apps: 'Listing apps...',
+                save_note: 'Saving note...',
+                get_events: 'Checking calendar...',
+                get_weather: 'Checking weather...',
+                get_contacts: 'Looking up contacts...',
+            };
+
+            try {
+                const result = await OrchestratorService.run(
+                    userMessage.content,
+                    systemPromptPrefix,
+                    (thought) => {
+                        // Show abbreviated thought as status
+                        const summary = thought.length > 60 ? thought.slice(0, 57) + '...' : thought;
+                        setAgentStatus(summary);
+                    },
+                    (action) => {
+                        // Show friendly tool name
+                        setAgentStatus(toolDisplayNames[action] || `Using ${action}...`);
+                    },
+                    // No onToken — raw ReAct text is not user-friendly
+                );
+
                 const assistantMessage: ChatMessage = {
                     role: 'assistant',
-                    content: result.text,
+                    content: result.finalAnswer || 'I wasn\'t able to come up with an answer.',
                     timestamp: new Date(),
                 };
                 setMessages([...newMessages, assistantMessage]);
+            } catch (error) {
+                const errorMessage: ChatMessage = {
+                    role: 'assistant',
+                    content: 'Something went wrong. Please try again.',
+                    timestamp: new Date(),
+                };
+                setMessages([...newMessages, errorMessage]);
+                console.error('[AskScreen] Orchestrator error:', error);
+            } finally {
+                setIsAgentRunning(false);
+                setAgentStatus('');
                 setStreamingText('');
             }
         } else if (mode === 'Vault') {
@@ -318,6 +360,7 @@ export const AskScreen: React.FC<AskScreenProps> = ({
         setClosureInput('');
         setMessages([]);
         setStreamingText('');
+        OrchestratorService.clearHistory();
     };
 
     const handleDownloadModel = async (modelId: 'qwen-2.5-1.5b' | 'smollm2-360m') => {
@@ -430,10 +473,17 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                     </View>
                 )}
 
-                {isGenerating && !streamingText && (
+                {isGenerating && !streamingText && !isAgentRunning && (
                     <View style={styles.streamingIndicator}>
                         <ActivityIndicator size="small" color={colors.accentPrimary} />
                         <Text style={styles.streamingText}>Thinking...</Text>
+                    </View>
+                )}
+
+                {isAgentRunning && (
+                    <View style={styles.streamingIndicator}>
+                        <ActivityIndicator size="small" color={colors.accentPrimary} />
+                        <Text style={styles.streamingText}>{agentStatus || 'Thinking...'}</Text>
                     </View>
                 )}
 
@@ -460,7 +510,7 @@ export const AskScreen: React.FC<AskScreenProps> = ({
             </ScrollView>
 
             {/* Session closure buttons */}
-            {hasActiveSession && mode === 'MirrorMesh' && !isGenerating && (
+            {hasActiveSession && mode === 'MirrorMesh' && !isGenerating && !isAgentRunning && (
                 <View style={styles.closureButtons}>
                     <ClosureButton label="Decide" glyph={glyphs.decision} onPress={() => openClosureModal('decide')} />
                     <ClosureButton label="Defer" onPress={() => openClosureModal('defer')} />
@@ -491,11 +541,11 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                     onSubmitEditing={handleSend}
                 />
                 <TouchableOpacity
-                    style={[styles.sendButton, (!input.trim() || isGenerating) && styles.sendButtonDisabled]}
+                    style={[styles.sendButton, (!input.trim() || isGenerating || isAgentRunning) && styles.sendButtonDisabled]}
                     onPress={handleSend}
-                    disabled={!input.trim() || isGenerating}
+                    disabled={!input.trim() || isGenerating || isAgentRunning}
                 >
-                    {isGenerating ? (
+                    {(isGenerating || isAgentRunning) ? (
                         <ActivityIndicator size="small" color={colors.textPrimary} />
                     ) : (
                         <Text style={styles.sendButtonText}>→</Text>
