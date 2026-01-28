@@ -13,10 +13,12 @@ import {
     Text,
     StyleSheet,
     Dimensions,
-    FlatList,
+    ScrollView,
     StatusBar,
     SafeAreaView,
     TouchableOpacity,
+    NativeSyntheticEvent,
+    NativeScrollEvent,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { NowScreen, AskScreen, VaultScreen, ActionsScreen } from './screens';
@@ -39,12 +41,13 @@ interface Panel {
 }
 
 export const App: React.FC = () => {
-    const flatListRef = useRef<FlatList>(null);
+    const scrollViewRef = useRef<ScrollView>(null);
     const [currentPanel, setCurrentPanel] = useState<PanelName>('NOW');
     const [isOnline, setIsOnline] = useState(false);
     const [identityLoaded, setIdentityLoaded] = useState(false);
     const [showIdentityModal, setShowIdentityModal] = useState(false);
     const [isGraphActive, setIsGraphActive] = useState(false);
+    const [panelHeight, setPanelHeight] = useState(0);
 
     // Initialize services on mount
     useEffect(() => {
@@ -114,28 +117,20 @@ export const App: React.FC = () => {
         },
     ];
 
-    const handleViewableItemsChanged = useCallback(
-        ({ viewableItems }: { viewableItems: Array<{ key?: string }> }) => {
-            if (viewableItems.length > 0 && viewableItems[0].key) {
-                setCurrentPanel(viewableItems[0].key as PanelName);
+    const handleScrollEnd = useCallback(
+        (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+            const offsetX = event.nativeEvent.contentOffset.x;
+            const index = Math.round(offsetX / SCREEN_WIDTH);
+            if (index >= 0 && index < panels.length) {
+                setCurrentPanel(panels[index].key);
             }
         },
-        []
+        [panels]
     );
-
-    const viewabilityConfig = {
-        itemVisiblePercentThreshold: 50,
-    };
 
     const scrollToPanel = (index: number) => {
-        flatListRef.current?.scrollToIndex({ index, animated: true });
+        scrollViewRef.current?.scrollTo({ x: index * SCREEN_WIDTH, animated: true });
     };
-
-    const renderPanel = ({ item }: { item: Panel }) => (
-        <View style={styles.panelContainer}>
-            {item.component}
-        </View>
-    );
 
     const currentIndex = panels.findIndex(p => p.key === currentPanel);
 
@@ -147,8 +142,8 @@ export const App: React.FC = () => {
             <SafeAreaView style={styles.contentContainer}>
                 <StatusBar
                     barStyle="light-content"
-                    backgroundColor="transparent"
-                    translucent={true}
+                    backgroundColor={colors.gradientStart}
+                    translucent={false}
                 />
 
                 {/* Top navigation bar */}
@@ -189,28 +184,29 @@ export const App: React.FC = () => {
                 </View>
 
                 {/* Horizontal panel navigation */}
-                <FlatList
-                    ref={flatListRef}
-                    data={panels}
-                    keyExtractor={item => item.key}
-                    renderItem={renderPanel}
-                    horizontal
-                    pagingEnabled
-                    scrollEnabled={currentPanel !== 'VAULT' || !isGraphActive}
-                    showsHorizontalScrollIndicator={false}
-                    bounces={false}
-                    onViewableItemsChanged={handleViewableItemsChanged}
-                    viewabilityConfig={viewabilityConfig}
-                    getItemLayout={(_, index) => ({
-                        length: SCREEN_WIDTH,
-                        offset: SCREEN_WIDTH * index,
-                        index,
-                    })}
-                    initialScrollIndex={0}
-                    decelerationRate="fast"
-                    snapToInterval={SCREEN_WIDTH}
-                    snapToAlignment="start"
-                />
+                <View
+                    style={{ flex: 1 }}
+                    onLayout={(e) => setPanelHeight(e.nativeEvent.layout.height)}
+                >
+                    {panelHeight > 0 && (
+                        <ScrollView
+                            ref={scrollViewRef}
+                            horizontal
+                            pagingEnabled
+                            scrollEnabled={currentPanel !== 'VAULT' || !isGraphActive}
+                            showsHorizontalScrollIndicator={false}
+                            bounces={false}
+                            onMomentumScrollEnd={handleScrollEnd}
+                            scrollEventThrottle={16}
+                        >
+                            {panels.map((panel) => (
+                                <View key={panel.key} style={{ width: SCREEN_WIDTH, height: panelHeight }}>
+                                    {panel.component}
+                                </View>
+                            ))}
+                        </ScrollView>
+                    )}
+                </View>
 
                 {/* Swipe hint for first-time users */}
                 {currentIndex === 0 && (
@@ -237,11 +233,6 @@ const styles = StyleSheet.create({
     contentContainer: {
         flex: 1,
     },
-    panelContainer: {
-        width: SCREEN_WIDTH,
-        flex: 1,
-    },
-
     // Navigation bar
     navBar: {
         flexDirection: 'row',

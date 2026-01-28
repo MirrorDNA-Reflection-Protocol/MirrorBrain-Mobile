@@ -52,8 +52,12 @@ class CalendarServiceClass {
      */
     async getTodayEvents(): Promise<CalendarEvent[]> {
         if (!this.hasPermission) {
-            const granted = await this.requestPermission();
-            if (!granted) return [];
+            // Check silently first — only prompt if not yet authorized
+            const alreadyGranted = await this.checkPermission();
+            if (!alreadyGranted) {
+                const granted = await this.requestPermission();
+                if (!granted) return [];
+            }
         }
 
         try {

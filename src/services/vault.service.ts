@@ -493,16 +493,23 @@ class VaultServiceClass {
             console.log('Pixel Vault path:', EXTERNAL_VAULT_PATHS.PIXEL_VAULT);
             console.log('Obsidian path:', EXTERNAL_VAULT_PATHS.OBSIDIAN);
 
-            // Request basic storage permission first
-            const granted = await PermissionsAndroid.request(
-                PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-                {
-                    title: 'Storage Access',
-                    message: 'MirrorBrain needs access to read your Obsidian vault',
-                    buttonPositive: 'Grant Access',
-                }
-            );
-            console.log('Storage permission result:', granted);
+            // Request legacy storage permission on SDK ≤ 32 only.
+            // On SDK 33+ (Android 13+), READ_EXTERNAL_STORAGE is dead —
+            // the app uses MANAGE_EXTERNAL_STORAGE granted via Settings.
+            const sdkVersion = typeof Platform.Version === 'number' ? Platform.Version : parseInt(String(Platform.Version), 10);
+            if (sdkVersion <= 32) {
+                const granted = await PermissionsAndroid.request(
+                    PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+                    {
+                        title: 'Storage Access',
+                        message: 'MirrorBrain needs access to read your Obsidian vault',
+                        buttonPositive: 'Grant Access',
+                    }
+                );
+                console.log('Storage permission result:', granted);
+            } else {
+                console.log('SDK 33+ — skipping READ_EXTERNAL_STORAGE, using MANAGE_EXTERNAL_STORAGE');
+            }
 
             // Check if external vault exists
             const pixelVaultExists = await RNFS.exists(EXTERNAL_VAULT_PATHS.PIXEL_VAULT);

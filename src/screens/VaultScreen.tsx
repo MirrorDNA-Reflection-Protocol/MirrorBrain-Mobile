@@ -60,26 +60,10 @@ export const VaultScreen: React.FC<VaultScreenProps> = ({ onLockSwipe }) => {
     const [showFileModal, setShowFileModal] = useState(false);
     const [selectedFile, setSelectedFile] = useState<{ title: string; content: string; path: string } | null>(null);
 
-    // Privacy Mode / Lock State
-    const [privacyModeEnabled, setPrivacyModeEnabled] = useState(false);
-    const [isLocked, setIsLocked] = useState(false); // Disabled by default — user enables via toggle
-    const [pinInput, setPinInput] = useState('');
-    const [pinError, setPinError] = useState(false);
-
-    const loadPrivacySettings = useCallback(async () => {
-        try {
-            const enabled = await AsyncStorage.getItem('@mirrorbrain/privacy_mode');
-            setPrivacyModeEnabled(enabled === 'true');
-            // If mode enabled, start locked
-            if (enabled === 'true') {
-                setIsLocked(true);
-            } else {
-                setIsLocked(false);
-            }
-        } catch {
-            console.warn('Failed to load privacy settings');
-        }
-    }, [setPrivacyModeEnabled, setIsLocked]);
+    // Auto-clear any stuck privacy lock from previous builds
+    useEffect(() => {
+        AsyncStorage.removeItem('@mirrorbrain/privacy_mode').catch(() => {});
+    }, []);
 
     const loadItems = useCallback(async () => {
         try {
@@ -100,33 +84,10 @@ export const VaultScreen: React.FC<VaultScreenProps> = ({ onLockSwipe }) => {
         }
     }, [filter]);
 
-    // Load items and privacy settings on mount
+    // Load items on mount
     useEffect(() => {
         loadItems();
-        loadPrivacySettings();
-    }, [loadItems, loadPrivacySettings]);
-
-    const togglePrivacyMode = async () => {
-        const newState = !privacyModeEnabled;
-        setPrivacyModeEnabled(newState);
-        setIsLocked(newState);
-        await AsyncStorage.setItem('@mirrorbrain/privacy_mode', newState.toString());
-        HapticService.select();
-    };
-
-    const handleUnlock = () => {
-        if (pinInput === '1111') { // TODO: Allow user to set PIN
-            setIsLocked(false);
-            setPinInput('');
-            setPinError(false);
-            HapticService.success();
-        } else {
-            setPinError(true);
-            setPinInput('');
-            HapticService.error();
-            setTimeout(() => setPinError(false), 500);
-        }
-    };
+    }, [loadItems]);
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
@@ -328,74 +289,12 @@ export const VaultScreen: React.FC<VaultScreenProps> = ({ onLockSwipe }) => {
                         {viewMode === 'list' ? '🕸️ Graph' : '📜 List'}
                     </Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.privacyToggle, privacyModeEnabled && styles.privacyToggleActive]}
-                    onPress={togglePrivacyMode}
-                >
-                    <Text style={styles.privacyToggleText}>
-                        {privacyModeEnabled ? '🔒 Secure' : '🔓 Open'}
-                    </Text>
-                </TouchableOpacity>
-                {storageInfo && !isLocked && (
+                {storageInfo && (
                     <Text style={styles.itemCount}>{storageInfo.items} items</Text>
                 )}
             </View>
 
-            {isLocked && privacyModeEnabled ? (
-                <View style={styles.lockContainer}>
-                    <Text style={styles.lockGlyph}>🔐</Text>
-                    <Text style={styles.lockTitle}>Vault Locked</Text>
-                    <Text style={styles.lockSubtitle}>Enter PIN to access your memories</Text>
-
-                    <View style={styles.pinDisplay}>
-                        {[...Array(4)].map((_, i) => (
-                            <View
-                                key={i}
-                                style={[
-                                    styles.pinDot,
-                                    pinInput.length > i && styles.pinDotFilled,
-                                    pinError && styles.pinDotError
-                                ]}
-                            />
-                        ))}
-                    </View>
-
-                    <View style={styles.keypad}>
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 'C', 0, '✓'].map((key) => (
-                            <TouchableOpacity
-                                key={key.toString()}
-                                style={styles.key}
-                                onPress={() => {
-                                    HapticService.tap();
-                                    if (key === 'C') setPinInput('');
-                                    else if (key === '✓') handleUnlock();
-                                    else if (pinInput.length < 4) {
-                                        const newPin = pinInput + key;
-                                        setPinInput(newPin);
-                                        if (newPin.length === 4) {
-                                            // Auto-verify
-                                            setTimeout(() => {
-                                                if (newPin === '1111') {
-                                                    setIsLocked(false);
-                                                    setPinInput('');
-                                                } else {
-                                                    setPinError(true);
-                                                    setPinInput('');
-                                                }
-                                            }, 100);
-                                        }
-                                    }
-                                }}
-                            >
-                                <Text style={styles.keyText}>{key}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-            ) : (
-                <>
-
-                    {/* Storage path indicator */}
+                {/* Storage path indicator */}
                     <TouchableOpacity
                         style={styles.pathIndicator}
                         onPress={() => Alert.alert('Vault Path', VaultService.getRootPath())}
@@ -600,8 +499,6 @@ export const VaultScreen: React.FC<VaultScreenProps> = ({ onLockSwipe }) => {
                             <Text style={styles.syncButtonText}>Backup</Text>
                         </TouchableOpacity>
                     </View>
-                </>
-            )}
 
             {/* Session Detail Modal */}
             <Modal
@@ -992,85 +889,6 @@ const styles = StyleSheet.create({
         ...typography.labelMedium,
         color: colors.textPrimary,
         fontWeight: '600',
-    },
-
-    // Privacy
-    privacyToggle: {
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 20,
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.surfaceElevated,
-        marginRight: spacing.sm,
-    },
-    privacyToggleActive: {
-        borderColor: colors.accentLight,
-    },
-    privacyToggleText: {
-        ...typography.labelSmall,
-        color: colors.textSecondary,
-    },
-
-    // Lock Overlay
-    lockContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: spacing.xl,
-    },
-    lockGlyph: {
-        fontSize: 64,
-        marginBottom: spacing.lg,
-    },
-    lockTitle: {
-        ...typography.displaySmall,
-        color: colors.textPrimary,
-        marginBottom: spacing.xs,
-    },
-    lockSubtitle: {
-        ...typography.bodyMedium,
-        color: colors.textSecondary,
-        marginBottom: spacing.xl,
-        textAlign: 'center',
-    },
-    pinDisplay: {
-        flexDirection: 'row',
-        gap: spacing.md,
-        marginBottom: spacing.xxl,
-    },
-    pinDot: {
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: colors.accentLight,
-    },
-    pinDotFilled: {
-        backgroundColor: colors.accentLight,
-    },
-    pinDotError: {
-        borderColor: colors.error,
-        backgroundColor: colors.error,
-    },
-    keypad: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        width: 280,
-        justifyContent: 'center',
-        gap: spacing.md,
-    },
-    key: {
-        width: 70,
-        height: 70,
-        borderRadius: 35,
-        backgroundColor: colors.surface,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    keyText: {
-        ...typography.headlineMedium,
-        color: colors.textPrimary,
     },
 
     // File Preview Modal Styles
