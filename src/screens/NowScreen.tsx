@@ -113,7 +113,7 @@ export const NowScreen: React.FC<NowScreenProps> = () => {
                         <View style={[styles.timelineLine, { marginTop: 48, width: 2 }]} />
                     </View>
                     <View style={styles.eventsContainer}>
-                        <Text style={styles.widgetTitle}>APRIL</Text>
+                        <Text style={styles.widgetTitle}>{currentTime.toLocaleDateString('en-US', { month: 'long' }).toUpperCase()}</Text>
                         <Text style={styles.calendarTitle}>
                             {nextEvent ? nextEvent.title : 'No immediate events'}
                         </Text>

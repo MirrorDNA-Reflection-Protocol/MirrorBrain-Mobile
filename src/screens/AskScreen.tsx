@@ -18,6 +18,7 @@ import {
     Platform,
     Modal,
     ActivityIndicator,
+    Keyboard,
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
 import { useLLM } from '../hooks';
@@ -102,7 +103,7 @@ export const AskScreen: React.FC<AskScreenProps> = ({
         setIsListening(false);
     };
 
-    // Check for model on mount
+    // Check for model on mount only
     useEffect(() => {
         const checkInitialModel = async () => {
             const hasQwen = await checkModelExists('qwen-2.5-1.5b');
@@ -113,7 +114,8 @@ export const AskScreen: React.FC<AskScreenProps> = ({
             }
         };
         checkInitialModel();
-    }, [checkModelExists, isModelLoaded, loadModel]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     // Load Serendipity Spark
     useEffect(() => {
         const loadSpark = async () => {
@@ -148,6 +150,8 @@ export const AskScreen: React.FC<AskScreenProps> = ({
 
     const handleSend = async () => {
         if (!input.trim()) return;
+
+        Keyboard.dismiss();
 
         const userMessage: ChatMessage = {
             role: 'user',
@@ -198,19 +202,13 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                 // No action needed if RAG fails, just proceed without context
             }
 
-            // Artificial "thinking" delay for realism
-            const thinkingDelay = new Promise<void>(resolve => setTimeout(resolve, 2000));
-
-            const [result] = await Promise.all([
-                chat(
-                    newMessages,
-                    systemPrompt,
-                    (token) => {
-                        setStreamingText(prev => prev + token);
-                    }
-                ),
-                thinkingDelay
-            ]);
+            const result = await chat(
+                newMessages,
+                systemPrompt,
+                (token) => {
+                    setStreamingText(prev => prev + token);
+                }
+            );
 
             if (result) {
                 const assistantMessage: ChatMessage = {

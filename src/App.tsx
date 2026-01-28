@@ -24,10 +24,7 @@ import { IdentityImportModal } from './components';
 import {
     VaultService,
     IdentityService,
-    SearchService,
-    OrchestratorService,
-    AppLauncherService,
-    WeatherService
+    registerDeviceTools,
 } from './services';
 import { colors, typography, spacing, glyphs } from './theme';
 import type { PanelName } from './types';
@@ -63,64 +60,8 @@ export const App: React.FC = () => {
             const hasIdentity = IdentityService.hasIdentity();
             setIdentityLoaded(hasIdentity);
 
-            // Register Orchestrator Tools
-            OrchestratorService.registerTools([
-                {
-                    name: 'launch_app',
-                    description: 'Launch an installed android application by package name',
-                    parameters: {
-                        type: 'object',
-                        properties: {
-                            packageName: { type: 'string', description: 'Package name (e.g. com.spotify.music)' }
-                        },
-                        required: ['packageName']
-                    },
-                    execute: async ({ packageName }: { packageName?: string }) => {
-                        const success = await AppLauncherService.launchApp(packageName || '');
-                        return { success, data: success ? 'App launched' : 'Failed to launch app' };
-                    }
-                },
-                {
-                    name: 'get_weather',
-                    description: 'Get current weather for user location',
-                    parameters: { type: 'object', properties: {} },
-                    execute: async () => {
-                        const weather = await WeatherService.getWeather();
-                        return { success: true, data: weather };
-                    }
-                },
-                {
-                    name: 'capture_note',
-                    description: 'Save a text note to the user vault',
-                    parameters: {
-                        type: 'object',
-                        properties: {
-                            content: { type: 'string', description: 'Note content' },
-                            title: { type: 'string', description: 'Optional title' }
-                        },
-                        required: ['content']
-                    },
-                    execute: async ({ content, title }: { content?: string; title?: string }) => {
-                        const id = await VaultService.saveCapture('note', content || '', title || '');
-                        return { success: !!id, data: { id } };
-                    }
-                },
-                {
-                    name: 'search_web',
-                    description: 'Search the web for real-time information with citations',
-                    parameters: {
-                        type: 'object',
-                        properties: {
-                            query: { type: 'string', description: 'Search query' }
-                        },
-                        required: ['query']
-                    },
-                    execute: async ({ query }: { query?: string }) => {
-                        const response = await SearchService.search(query || '');
-                        return { success: true, data: response };
-                    }
-                }
-            ]);
+            // Register all device tools with orchestrator
+            registerDeviceTools();
 
             // If no identity, prompt to import on first launch
             if (!hasIdentity) {

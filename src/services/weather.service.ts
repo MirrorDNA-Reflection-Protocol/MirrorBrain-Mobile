@@ -48,9 +48,12 @@ class WeatherServiceClass {
             console.warn('Weather cache read failed:', error);
         }
 
-        // Return mock weather (real implementation would fetch from API)
-        // Using Open-Meteo (free, no API key) or wttr.in
-        return this.getMockWeather();
+        // Try real API first, fall back to mock
+        try {
+            return await this.refresh();
+        } catch {
+            return this.getMockWeather();
+        }
     }
 
     /**
