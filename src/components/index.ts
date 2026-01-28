@@ -1,11 +1,9 @@
-/**
- * Components Index
- */
-
-export { IdentityImportModal } from './IdentityImportModal';
-export { GlassView } from './GlassView';
-export { WeatherWidget } from './WeatherWidget';
-export { AppGridWidget } from './AppGridWidget';
-export { BrowserPane } from './BrowserPane';
-export { SearchResultCard } from './SearchResultCard';
-
+export * from './MirrorGraph';
+export * from './BrowserPane';
+export * from './SearchResultCard';
+export * from './RefineButton';
+export * from './GlassView';
+export * from './WeatherWidget';
+export * from './AppGridWidget';
+export * from './IdentityPulseWidget';
+export * from './IdentityImportModal';

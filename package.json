@@ -22,8 +22,10 @@
     "react-native-fs": "^2.20.0",
     "react-native-haptic-feedback": "^2.3.3",
     "react-native-linear-gradient": "^2.8.3",
+    "react-native-reanimated": "^4.2.1",
     "react-native-safe-area-context": "^5.5.2",
-    "react-native-webview": "^13.16.0"
+    "react-native-webview": "^13.16.0",
+    "react-native-worklets": "^0.7.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

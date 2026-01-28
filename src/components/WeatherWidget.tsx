@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { GlassView } from './GlassView';
-import { colors, typography, spacing } from '../theme';
+import { spacing } from '../theme';
 import { WeatherService } from '../services';
 
 interface WeatherData {
@@ -40,20 +40,9 @@ export const WeatherWidget: React.FC = () => {
                     icon: WeatherService.getIcon(data.condition)
                 });
             }
-        } catch (error) {
+        } catch {
             console.log('Weather: Using cached data');
         }
-    };
-
-    const getWeatherIcon = (condition: string): string => {
-        const lower = condition.toLowerCase();
-        if (lower.includes('sun') || lower.includes('clear')) return '☀️';
-        if (lower.includes('cloud')) return '⛅';
-        if (lower.includes('rain')) return '🌧️';
-        if (lower.includes('storm')) return '⛈️';
-        if (lower.includes('snow')) return '❄️';
-        if (lower.includes('fog') || lower.includes('mist')) return '🌫️';
-        return '🌤️';
     };
 
     return (

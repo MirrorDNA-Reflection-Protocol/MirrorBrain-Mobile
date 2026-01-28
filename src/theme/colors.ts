@@ -21,6 +21,9 @@ export const colors = {
     accentPrimary: '#6366f1',    // Indigo-500
     accentLight: '#818cf8',      // Indigo-400
     accentDark: '#4f46e5',       // Indigo-600
+    accentSecondary: '#818cf8',  // Secondary accent
+    accent: '#6366f1',           // General accent alias
+    border: '#27272a',           // Zinc-800
 
     // Semantic
     online: '#22c55e',           // Green - network active

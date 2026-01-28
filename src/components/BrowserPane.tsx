@@ -14,7 +14,6 @@ import {
     TextInput,
     SafeAreaView,
     StatusBar,
-    Platform,
     Share,
     Linking,
 } from 'react-native';

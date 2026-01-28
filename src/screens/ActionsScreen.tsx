@@ -6,7 +6,7 @@
  * Each action is explicit, single-step, user-initiated.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -137,7 +137,7 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
         try {
             const events = await CalendarService.getTodayEvents();
             setCalendarEvents(events);
-        } catch (error) {
+        } catch {
             Alert.alert('Calendar', 'Failed to load calendar events');
         } finally {
             setLoadingCalendar(false);
@@ -163,7 +163,7 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
         } else {
             // Start listening
             setRecordingText('');
-            const started = await VoiceService.startListening((text, isFinal) => {
+            const started = await VoiceService.startListening((text, _isFinal) => {
                 setRecordingText(text);
             });
 

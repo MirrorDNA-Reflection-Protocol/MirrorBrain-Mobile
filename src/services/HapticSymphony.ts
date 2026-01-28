@@ -16,7 +16,7 @@ export const HapticSymphony = {
     // The heartbeat of the system. Used in "Ask" waiting states.
     heartbeat: async () => {
         ReactNativeHapticFeedback.trigger('impactLight', options);
-        await new Promise(r => setTimeout(r, 100)); // Systole
+        await new Promise<void>(r => setTimeout(r, 100)); // Systole
         ReactNativeHapticFeedback.trigger('impactHeavy', options);
     },
 

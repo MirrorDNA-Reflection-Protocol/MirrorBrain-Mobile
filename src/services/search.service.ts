@@ -1,8 +1,8 @@
 /**
  * Search Service — Web Search Integration
  * 
- * Provides Perplexity-style web search with citations.
- * Uses DuckDuckGo Instant Answer API (free, no key needed).
+ * Uses DuckDuckGo HTML scraping for web results.
+ * Note: This is a workaround since DDG Instant Answer API is limited.
  */
 
 export interface SearchResult {
@@ -16,11 +16,9 @@ export interface SearchResult {
 export interface SearchResponse {
     query: string;
     results: SearchResult[];
-    answer?: string;  // AI-generated summary
+    answer?: string;
     relatedQueries?: string[];
 }
-
-const DUCKDUCKGO_API = 'https://api.duckduckgo.com/';
 
 class SearchServiceClass {
     private cache: Map<string, SearchResponse> = new Map();
@@ -32,62 +30,33 @@ class SearchServiceClass {
         // Check cache first
         const cacheKey = `${query}_${limit}`;
         if (this.cache.has(cacheKey)) {
+            console.log('Search: Cache hit for', query);
             return this.cache.get(cacheKey)!;
         }
 
         try {
-            // DuckDuckGo Instant Answer API
-            const response = await fetch(
-                `${DUCKDUCKGO_API}?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`
-            );
-            const data = await response.json();
+            console.log('Search: Querying for', query);
 
-            const results: SearchResult[] = [];
+            // Use DuckDuckGo Lite for better scraping
+            const results = await this.searchDDGLite(query, limit);
 
-            // Add abstract if available
-            if (data.AbstractText && data.AbstractURL) {
-                results.push({
-                    title: data.Heading || query,
-                    url: data.AbstractURL,
-                    snippet: data.AbstractText.slice(0, 200) + '...',
-                    source: data.AbstractSource || 'Wikipedia',
-                    favicon: this.getFavicon(data.AbstractURL),
-                });
-            }
-
-            // Add related topics
-            if (data.RelatedTopics && Array.isArray(data.RelatedTopics)) {
-                for (const topic of data.RelatedTopics.slice(0, limit - 1)) {
-                    if (topic.FirstURL && topic.Text) {
-                        results.push({
-                            title: topic.Text.split(' - ')[0] || topic.Text.slice(0, 50),
-                            url: topic.FirstURL,
-                            snippet: topic.Text.slice(0, 150),
-                            source: this.extractDomain(topic.FirstURL),
-                            favicon: this.getFavicon(topic.FirstURL),
-                        });
-                    }
-                }
-            }
-
-            // If no results from instant answer, try HTML scrape fallback
+            // If DDG Lite fails, try HTML version
             if (results.length === 0) {
-                const htmlResults = await this.searchHTML(query, limit);
+                console.log('Search: DDG Lite empty, trying HTML');
+                const htmlResults = await this.searchDDGHTML(query, limit);
                 results.push(...htmlResults);
             }
 
             const searchResponse: SearchResponse = {
                 query,
                 results,
-                relatedQueries: data.RelatedTopics
-                    ?.filter((t: any) => t.Name)
-                    ?.map((t: any) => t.Name)
-                    ?.slice(0, 5),
             };
 
-            // Cache the result
+            // Cache for 5 minutes
             this.cache.set(cacheKey, searchResponse);
+            setTimeout(() => this.cache.delete(cacheKey), 5 * 60 * 1000);
 
+            console.log('Search: Found', results.length, 'results');
             return searchResponse;
         } catch (error) {
             console.error('Search failed:', error);
@@ -96,55 +65,147 @@ class SearchServiceClass {
     }
 
     /**
-     * Fallback: Scrape DuckDuckGo HTML results
+     * Search using DuckDuckGo Lite (mobile-friendly, easier to parse)
      */
-    private async searchHTML(query: string, limit: number): Promise<SearchResult[]> {
+    private async searchDDGLite(query: string, limit: number): Promise<SearchResult[]> {
         try {
             const response = await fetch(
-                `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
+                `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`,
                 {
+                    method: 'POST',
                     headers: {
-                        'User-Agent': 'MirrorBrain/1.0',
+                        'User-Agent': 'Mozilla/5.0 (Android 14; Mobile) MirrorBrain/1.0',
+                        'Accept': 'text/html',
                     },
                 }
             );
+
+            if (!response.ok) {
+                throw new Error(`DDG Lite returned ${response.status}`);
+            }
+
             const html = await response.text();
-
-            // Simple regex parsing for results
             const results: SearchResult[] = [];
-            const resultPattern = /<a class="result__a" href="([^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([^<]+)/g;
 
+            // Parse DDG Lite results
+            // Format: <a rel="nofollow" href="URL" class='result-link'>TITLE</a>
+            // followed by snippet in <td class='result-snippet'>
+            const linkPattern = /<a[^>]*class=['"]?result-link['"]?[^>]*href=['"]([^'"]+)['"][^>]*>([^<]+)<\/a>/gi;
+            const snippetPattern = /<td[^>]*class=['"]?result-snippet['"]?[^>]*>([^<]+)/gi;
+
+            const links: Array<{ url: string; title: string }> = [];
             let match;
-            while ((match = resultPattern.exec(html)) !== null && results.length < limit) {
+
+            while ((match = linkPattern.exec(html)) !== null && links.length < limit) {
                 const url = match[1];
+                const title = this.decodeHtmlEntities(match[2].trim());
+                if (url.startsWith('http') && !url.includes('duckduckgo.com')) {
+                    links.push({ url, title });
+                }
+            }
+
+            const snippets: string[] = [];
+            while ((match = snippetPattern.exec(html)) !== null) {
+                snippets.push(this.decodeHtmlEntities(match[1].trim()));
+            }
+
+            for (let i = 0; i < links.length && results.length < limit; i++) {
                 results.push({
-                    title: match[2].trim(),
-                    url: url,
-                    snippet: match[3].trim(),
-                    source: this.extractDomain(url),
-                    favicon: this.getFavicon(url),
+                    title: links[i].title,
+                    url: links[i].url,
+                    snippet: snippets[i] || '',
+                    source: this.extractDomain(links[i].url),
+                    favicon: this.getFavicon(links[i].url),
                 });
             }
 
             return results;
         } catch (error) {
-            console.warn('HTML search fallback failed:', error);
+            console.warn('DDG Lite search failed:', error);
             return [];
         }
     }
 
     /**
-     * Generate AI summary using local model
+     * Fallback: Regular DuckDuckGo HTML
      */
-    async generateSummary(query: string, results: SearchResult[]): Promise<string> {
-        // This would call the local AI service
-        // For now, return a formatted summary of top results
-        if (results.length === 0) {
-            return "I couldn't find any results for that query.";
-        }
+    private async searchDDGHTML(query: string, limit: number): Promise<SearchResult[]> {
+        try {
+            const response = await fetch(
+                `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
+                {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Android 14; Mobile) MirrorBrain/1.0',
+                        'Accept': 'text/html',
+                    },
+                }
+            );
 
-        const topResult = results[0];
-        return `Based on ${topResult.source}: ${topResult.snippet}`;
+            if (!response.ok) {
+                throw new Error(`DDG HTML returned ${response.status}`);
+            }
+
+            const html = await response.text();
+            const results: SearchResult[] = [];
+
+            // Parse result links
+            // <a class="result__a" href="URL">TITLE</a>
+            const resultPattern = /<a[^>]*class=['"]?result__a['"]?[^>]*href=['"]([^'"]+)['"][^>]*>([^<]+)<\/a>/gi;
+            const snippetPattern = /<a[^>]*class=['"]?result__snippet['"]?[^>]*>([^<]+)/gi;
+
+            const links: Array<{ url: string; title: string }> = [];
+            let match;
+
+            while ((match = resultPattern.exec(html)) !== null && links.length < limit * 2) {
+                let url = match[1];
+                const title = this.decodeHtmlEntities(match[2].trim());
+
+                // DDG HTML uses redirect URLs, try to extract actual URL
+                if (url.includes('uddg=')) {
+                    const urlMatch = url.match(/uddg=([^&]+)/);
+                    if (urlMatch) {
+                        url = decodeURIComponent(urlMatch[1]);
+                    }
+                }
+
+                if (url.startsWith('http') && !url.includes('duckduckgo.com')) {
+                    links.push({ url, title });
+                }
+            }
+
+            const snippets: string[] = [];
+            while ((match = snippetPattern.exec(html)) !== null) {
+                snippets.push(this.decodeHtmlEntities(match[1].trim()));
+            }
+
+            for (let i = 0; i < links.length && results.length < limit; i++) {
+                results.push({
+                    title: links[i].title,
+                    url: links[i].url,
+                    snippet: snippets[i] || 'No description available',
+                    source: this.extractDomain(links[i].url),
+                    favicon: this.getFavicon(links[i].url),
+                });
+            }
+
+            return results;
+        } catch (error) {
+            console.warn('DDG HTML search failed:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Decode HTML entities
+     */
+    private decodeHtmlEntities(text: string): string {
+        return text
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/&nbsp;/g, ' ');
     }
 
     /**
@@ -152,7 +213,8 @@ class SearchServiceClass {
      */
     private getFavicon(url: string): string {
         try {
-            const domain = new URL(url).hostname;
+            const match = url.match(/:\/\/(www[0-9]?\.)?(.[^/:]+)/i);
+            const domain = match ? match[2] : url;
             return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
         } catch {
             return '';
@@ -164,7 +226,8 @@ class SearchServiceClass {
      */
     private extractDomain(url: string): string {
         try {
-            return new URL(url).hostname.replace('www.', '');
+            const match = url.match(/:\/\/(www[0-9]?\.)?(.[^/:]+)/i);
+            return match ? match[2] : url;
         } catch {
             return 'web';
         }
@@ -180,3 +243,4 @@ class SearchServiceClass {
 
 export const SearchService = new SearchServiceClass();
 export default SearchService;
+

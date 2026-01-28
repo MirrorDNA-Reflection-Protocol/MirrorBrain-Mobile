@@ -12,8 +12,8 @@
 
 import RNFS from 'react-native-fs';
 import { Share, Platform } from 'react-native';
-import { VaultService, STORAGE_PATHS } from './vault.service';
-import type { VaultItem, ChatMessage, SessionClosure } from '../types';
+import { VaultService } from './vault.service';
+import type { VaultItem } from '../types';
 
 export interface SyncPackage {
     version: '1.0';

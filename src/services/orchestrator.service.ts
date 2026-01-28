@@ -169,7 +169,7 @@ class OrchestratorServiceClass {
     /**
      * Build system prompt with available tool descriptions
      */
-    private buildSystemPrompt(): string {
+    private buildSystemPrompt(prefix?: string): string {
         const availableTools = this.listTools();
         const failedToolNames = new Set(
             Array.from(this.toolFailures.values())
@@ -187,7 +187,8 @@ class OrchestratorServiceClass {
             })
             .join('\n');
 
-        return REACT_SYSTEM_PROMPT.replace('{tools}', toolDescriptions || 'None');
+        const basePrompt = REACT_SYSTEM_PROMPT.replace('{tools}', toolDescriptions || 'None');
+        return prefix ? `${prefix}\n\n${basePrompt}` : basePrompt;
     }
 
     /**
@@ -275,20 +276,20 @@ class OrchestratorServiceClass {
         // Check backoff
         if (this.isToolInBackoff(toolName)) {
             const failure = this.toolFailures.get(toolName)!;
-            return { 
-                success: false, 
-                error: `Tool in backoff: ${failure.lastError}`, 
-                retryable: false 
+            return {
+                success: false,
+                error: `Tool in backoff: ${failure.lastError}`,
+                retryable: false
             };
         }
 
         // Check max retries exceeded
         const failure = this.toolFailures.get(toolName);
         if (failure && failure.attempts >= (tool.maxRetries || 2)) {
-            return { 
-                success: false, 
-                error: `Max retries exceeded: ${failure.lastError}`, 
-                retryable: false 
+            return {
+                success: false,
+                error: `Max retries exceeded: ${failure.lastError}`,
+                retryable: false
             };
         }
 
@@ -331,6 +332,7 @@ class OrchestratorServiceClass {
      */
     async run(
         userMessage: string,
+        systemPromptPrefix?: string,
         onThought?: (thought: string) => void,
         onAction?: (action: string, params: Record<string, unknown>) => void,
         onToken?: (token: string) => void
@@ -365,7 +367,7 @@ class OrchestratorServiceClass {
             iterations++;
 
             // Rebuild system prompt (excludes exhausted tools)
-            const systemPrompt = this.buildSystemPrompt();
+            const systemPrompt = this.buildSystemPrompt(systemPromptPrefix);
 
             // Get LLM response
             const result = await LLMService.chat(messages, systemPrompt, onToken);
@@ -451,7 +453,7 @@ class OrchestratorServiceClass {
 
         // Max iterations — graceful exit
         const exhaustedTools = this.getExhaustedTools();
-        const failureNote = exhaustedTools.length > 0 
+        const failureNote = exhaustedTools.length > 0
             ? ` (${exhaustedTools.join(', ')} unavailable)`
             : '';
 
@@ -497,18 +499,18 @@ class OrchestratorServiceClass {
      */
     getToolStatus(): Record<string, { available: boolean; failures: number; error?: string }> {
         const status: Record<string, { available: boolean; failures: number; error?: string }> = {};
-        
+
         for (const [name, tool] of this.tools) {
             const failure = this.toolFailures.get(name);
             const maxRetries = tool.maxRetries || 2;
-            
+
             status[name] = {
                 available: !failure || failure.attempts < maxRetries,
                 failures: failure?.attempts || 0,
                 error: failure?.lastError,
             };
         }
-        
+
         return status;
     }
 }

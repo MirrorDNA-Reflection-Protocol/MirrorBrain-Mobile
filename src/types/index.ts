@@ -32,9 +32,10 @@ export interface MirrorMeshSession {
 }
 
 export interface ChatMessage {
-    role: 'user' | 'assistant' | 'system';
+    role: 'user' | 'assistant' | 'system' | 'thought' | 'observation';
     content: string;
     timestamp: Date;
+    thoughts?: string[];
 }
 
 // Session closure from spec Part IV

@@ -32,6 +32,14 @@ export const typography = {
         letterSpacing: -0.25,
     } as TextStyle,
 
+    displaySmall: {
+        fontFamily,
+        fontSize: 24,
+        fontWeight: '600',
+        lineHeight: 32,
+        letterSpacing: 0,
+    } as TextStyle,
+
     // Headlines
     headlineLarge: {
         fontFamily,

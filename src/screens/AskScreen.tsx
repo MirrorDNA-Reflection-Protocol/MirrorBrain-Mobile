@@ -22,8 +22,9 @@ import {
 import { colors, typography, spacing, glyphs } from '../theme';
 import { useLLM } from '../hooks';
 import { VaultService, IdentityService, HapticSymphony, VoiceService, SearchService } from '../services';
-import type { SearchResult, SearchResponse } from '../services';
+import type { SearchResult, MemorySpark } from '../services';
 import { BrowserPane, SearchResultCard } from '../components';
+import { RefineButton } from '../components/RefineButton';
 import type { AskMode, ChatMessage, SessionClosure } from '../types';
 
 // System prompt for MirrorMesh
@@ -65,6 +66,9 @@ export const AskScreen: React.FC<AskScreenProps> = ({
     const [isSearching, setIsSearching] = useState(false);
     const [browserUrl, setBrowserUrl] = useState<string | null>(null);
 
+    // Serendipity
+    const [spark, setSpark] = useState<MemorySpark | null>(null);
+
     const {
         isModelLoaded,
         loadedModel,
@@ -83,7 +87,7 @@ export const AskScreen: React.FC<AskScreenProps> = ({
         setInput('');
         setIsListening(true);
 
-        const started = await VoiceService.startListening((text, isFinal) => {
+        const started = await VoiceService.startListening((text, _isFinal) => {
             setInput(text);
         });
 
@@ -100,21 +104,28 @@ export const AskScreen: React.FC<AskScreenProps> = ({
 
     // Check for model on mount
     useEffect(() => {
+        const checkInitialModel = async () => {
+            const hasQwen = await checkModelExists('qwen-2.5-1.5b');
+            if (hasQwen && !isModelLoaded) {
+                await loadModel('qwen-2.5-1.5b');
+            } else if (!hasQwen) {
+                setShowModelModal(true);
+            }
+        };
         checkInitialModel();
+    }, [checkModelExists, isModelLoaded, loadModel]);
+    // Load Serendipity Spark
+    useEffect(() => {
+        const loadSpark = async () => {
+            const memory = await VaultService.getRandomMemory();
+            if (memory) setSpark(memory);
+        };
+        loadSpark();
     }, []);
-
-    const checkInitialModel = async () => {
-        const hasQwen = await checkModelExists('qwen-2.5-1.5b');
-        if (hasQwen && !isModelLoaded) {
-            await loadModel('qwen-2.5-1.5b');
-        } else if (!hasQwen) {
-            setShowModelModal(true);
-        }
-    };
 
     // Haptic Heartbeat during generation
     useEffect(() => {
-        let heartbeatInterval: NodeJS.Timeout;
+        let heartbeatInterval: ReturnType<typeof setTimeout> | null = null;
         if (isGenerating) {
             HapticSymphony.heartbeat();
             heartbeatInterval = setInterval(() => {
@@ -161,14 +172,34 @@ export const AskScreen: React.FC<AskScreenProps> = ({
             }
 
             let systemPrompt = MIRRORMESH_SYSTEM_PROMPT;
+
+            // 1. Identity Context
             if (identityLoaded) {
                 const identityContext = IdentityService.getContext();
                 if (identityContext) {
-                    systemPrompt = `${MIRRORMESH_SYSTEM_PROMPT}\n\nUser Identity:\n${identityContext}`;
+                    systemPrompt += `\n\nUser Identity:\n${identityContext}`;
                 }
             }
 
-            const thinkingDelay = new Promise(resolve => setTimeout(resolve, 2000));
+            // 2. RAG Context (The "Mind" Integration)
+            // Silently search vault for relevant memories
+            try {
+                const relevantNotes = await VaultService.search(input.trim());
+                if (relevantNotes.length > 0) {
+                    // Take top 3 most relevant
+                    const topContext = relevantNotes.slice(0, 3).map(n =>
+                        `[Note: ${n.title}]\n${n.content.slice(0, 300)}...`
+                    ).join('\n\n');
+
+                    systemPrompt += `\n\nRELEVANT MEMORIES FROM VAULT:\n${topContext}\n\n(Use these memories to ground your answer in the user's reality. If they contradict general knowledge, prefer the memories.)`;
+                    console.log('[RAG] Injected context tokens');
+                }
+            } catch {
+                // No action needed if RAG fails, just proceed without context
+            }
+
+            // Artificial "thinking" delay for realism
+            const thinkingDelay = new Promise<void>(resolve => setTimeout(resolve, 2000));
 
             const [result] = await Promise.all([
                 chat(
@@ -218,7 +249,7 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                     timestamp: new Date(),
                 };
                 setMessages([...newMessages, responseMessage]);
-            } catch (error) {
+            } catch {
                 const errorMessage: ChatMessage = {
                     role: 'assistant',
                     content: 'Search failed. Please try again.',
@@ -278,7 +309,7 @@ export const AskScreen: React.FC<AskScreenProps> = ({
 
         // Haptic confirmation
         await HapticSymphony.shatter();
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise<void>(r => setTimeout(r, 300));
 
         // Save session to vault
         await VaultService.saveSession(messages, closure);
@@ -373,6 +404,22 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                         {identityLoaded && (
                             <Text style={styles.identityIndicator}>{glyphs.truth} Identity loaded</Text>
                         )}
+
+                        {/* Serendipity Spark */}
+                        {spark && mode === 'MirrorMesh' && (
+                            <TouchableOpacity
+                                style={styles.sparkCard}
+                                onPress={() => setInput(`Let's talk about this memory: "${spark.title}"`)}
+                            >
+                                <View style={styles.sparkHeader}>
+                                    <Text style={styles.sparkIcon}>⚡</Text>
+                                    <Text style={styles.sparkLabel}>MEMORY SPARK</Text>
+                                    <Text style={styles.sparkDate}>{spark.date.toLocaleDateString()}</Text>
+                                </View>
+                                <Text style={styles.sparkTitle}>{spark.title}</Text>
+                                <Text style={styles.sparkPreview} numberOfLines={3}>{spark.content}</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 ) : (
                     messages.map((msg, index) => <MessageBubble key={index} message={msg} />)
@@ -429,6 +476,11 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                 <TouchableOpacity style={styles.micButton} onPress={isListening ? handleStopVoice : handleStartVoice}>
                     <Text style={styles.micButtonText}>{isListening ? '🛑' : '🎤'}</Text>
                 </TouchableOpacity>
+                <RefineButton
+                    text={input}
+                    onRefine={(polished) => setInput(polished)}
+                    style={{ marginRight: spacing.sm }}
+                />
                 <TextInput
                     style={styles.input}
                     placeholder={isListening ? "Listening..." : getPlaceholder(mode)}
@@ -697,6 +749,15 @@ const styles = StyleSheet.create({
 
     // Search Results
     searchResults: { marginTop: spacing.md },
+
+    // Serendipity Spark
+    sparkCard: { marginTop: spacing.xl, padding: spacing.md, backgroundColor: '#1A1A1A', borderRadius: 12, borderWidth: 1, borderColor: colors.accentSecondary, maxWidth: '90%' },
+    sparkHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
+    sparkIcon: { fontSize: 16, marginRight: spacing.xs },
+    sparkLabel: { ...typography.labelSmall, color: colors.accentSecondary, fontWeight: 'bold', flex: 1 },
+    sparkDate: { ...typography.labelSmall, color: colors.textMuted },
+    sparkTitle: { ...typography.headlineSmall, color: colors.textPrimary, marginBottom: 4 },
+    sparkPreview: { ...typography.bodySmall, color: colors.textSecondary },
 });
 
 export default AskScreen;

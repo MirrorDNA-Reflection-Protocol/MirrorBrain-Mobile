@@ -28,7 +28,7 @@ class KiwixServiceClass {
                     component: `${KIWIX_PACKAGE_ID}/.main.KiwixActivity`, // Try generic launch
                     // If component specific fails, try package based intent
                     flags: 268435456, // FLAG_ACTIVITY_NEW_TASK
-                }).catch(async (err) => {
+                }).catch(async (err: any) => {
                     console.log('Direct component launch failed, trying generic intent', err);
                     // Fallback: Just try launching the package via standard launcher intent logic usually handled by library
                     // react-native-intent-launcher is a bit low level.
@@ -69,7 +69,7 @@ class KiwixServiceClass {
     async launch() {
         if (Platform.OS === 'android') {
             IntentLauncher.isAppInstalled(KIWIX_PACKAGE_ID)
-                .then((isInstalled) => {
+                .then((isInstalled: boolean) => {
                     if (isInstalled) {
                         // Just launch it. 
                         // Note: IntentLauncher.startAppByPackageName is what we want if it existed.

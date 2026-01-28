@@ -57,7 +57,7 @@ export const IdentityImportModal: React.FC<IdentityImportModalProps> = ({
             } else {
                 Alert.alert('Error', 'Invalid Mirror Seed format');
             }
-        } catch (error) {
+        } catch {
             Alert.alert('Error', 'Failed to parse Mirror Seed. Please check the format.');
         } finally {
             setIsLoading(false);

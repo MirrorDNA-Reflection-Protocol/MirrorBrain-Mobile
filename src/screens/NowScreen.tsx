@@ -11,16 +11,12 @@ import {
     StyleSheet,
     ScrollView,
     RefreshControl,
-    Animated,
-    Image,
-    Dimensions,
 } from 'react-native';
 
-import { colors, typography, spacing, glyphs } from '../theme';
-import { GlassView, WeatherWidget, AppGridWidget } from '../components';
+import { colors, typography, spacing } from '../theme';
+import { GlassView, WeatherWidget, AppGridWidget, IdentityPulseWidget } from '../components';
 import {
     CalendarService,
-    DeviceService,
     HapticService,
     type CalendarEvent,
 } from '../services';
@@ -30,12 +26,7 @@ interface NowScreenProps {
     onToggleQuietMode?: () => void;
 }
 
-const { width } = Dimensions.get('window');
-
-export const NowScreen: React.FC<NowScreenProps> = ({
-    isOnline,
-    onToggleQuietMode,
-}) => {
+export const NowScreen: React.FC<NowScreenProps> = () => {
     // Real-time clock state
     const [currentTime, setCurrentTime] = useState(new Date());
     const [refreshing, setRefreshing] = useState(false);
@@ -58,7 +49,7 @@ export const NowScreen: React.FC<NowScreenProps> = ({
         try {
             const event = await CalendarService.getNextEvent();
             setNextEvent(event);
-        } catch (error) {
+        } catch {
             console.log('Calendar not available');
         }
     };
@@ -108,6 +99,9 @@ export const NowScreen: React.FC<NowScreenProps> = ({
                     <AppGridWidget />
                 </View>
             </View>
+
+            {/* Identity Pulse */}
+            <IdentityPulseWidget />
 
             {/* Calendar Widget */}
             <GlassView style={styles.calendarWidget}>

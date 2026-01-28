@@ -13,12 +13,12 @@
 
 import RNFS from 'react-native-fs';
 import { PermissionsAndroid, Platform } from 'react-native';
-import type { VaultItem, CaptureItem, SessionClosure, ChatMessage } from '../types';
+import type { VaultItem, SessionClosure, ChatMessage } from '../types';
 
 // External vault paths on Pixel
 export const EXTERNAL_VAULT_PATHS = {
     PIXEL_VAULT: '/storage/emulated/0/Pixel Vault',
-    OBSIDIAN: '/storage/emulated/0/Obsidian',
+    OBSIDIAN: '/storage/emulated/0/Obsidian/MirrorDNA-Vault',
     CHRYSALIS: '/storage/emulated/0/Chrysalis',
 } as const;
 
@@ -64,6 +64,13 @@ interface StoredCapture {
     createdAt: string;
     updatedAt: string;
     tags?: string[];
+}
+
+export interface MemorySpark {
+    id: string;
+    title: string;
+    content: string;
+    date: Date;
 }
 
 interface StoredDecision {
@@ -301,7 +308,7 @@ class VaultServiceClass {
                             tags: data.tags,
                         });
                     } catch (parseError) {
-                        console.warn('Failed to parse vault item:', file.name);
+                        console.warn('Failed to parse vault item:', file.name, parseError);
                     }
                 }
             }
@@ -316,19 +323,7 @@ class VaultServiceClass {
         }
     }
 
-    /**
-     * Search vault by keyword
-     */
-    async search(query: string): Promise<VaultItem[]> {
-        const allItems = await this.listItems();
-        const lowerQuery = query.toLowerCase();
 
-        return allItems.filter(item =>
-            item.title.toLowerCase().includes(lowerQuery) ||
-            item.content.toLowerCase().includes(lowerQuery) ||
-            item.tags?.some(tag => tag.toLowerCase().includes(lowerQuery))
-        );
-    }
 
     /**
      * Get a specific item by ID
@@ -484,26 +479,48 @@ class VaultServiceClass {
         }
     }
 
+
+
     /**
      * Request external storage access for Pixel Vault
+     * On Android 11+, requires MANAGE_EXTERNAL_STORAGE which user must grant in Settings
      */
     async requestExternalAccess(): Promise<boolean> {
         if (Platform.OS !== 'android') return false;
 
         try {
+            console.log('Checking vault paths...');
+            console.log('Pixel Vault path:', EXTERNAL_VAULT_PATHS.PIXEL_VAULT);
+            console.log('Obsidian path:', EXTERNAL_VAULT_PATHS.OBSIDIAN);
+
+            // Request basic storage permission first
+            const granted = await PermissionsAndroid.request(
+                PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+                {
+                    title: 'Storage Access',
+                    message: 'MirrorBrain needs access to read your Obsidian vault',
+                    buttonPositive: 'Grant Access',
+                }
+            );
+            console.log('Storage permission result:', granted);
+
             // Check if external vault exists
             const pixelVaultExists = await RNFS.exists(EXTERNAL_VAULT_PATHS.PIXEL_VAULT);
             const obsidianExists = await RNFS.exists(EXTERNAL_VAULT_PATHS.OBSIDIAN);
 
-            if (pixelVaultExists) {
-                this.externalVaultPath = EXTERNAL_VAULT_PATHS.PIXEL_VAULT;
-                this.hasExternalAccess = true;
-            } else if (obsidianExists) {
+            console.log('Pixel Vault exists:', pixelVaultExists);
+            console.log('Obsidian exists:', obsidianExists);
+
+            if (obsidianExists) {
                 this.externalVaultPath = EXTERNAL_VAULT_PATHS.OBSIDIAN;
+                this.hasExternalAccess = true;
+            } else if (pixelVaultExists) {
+                this.externalVaultPath = EXTERNAL_VAULT_PATHS.PIXEL_VAULT;
                 this.hasExternalAccess = true;
             }
 
-            console.log('External vault path:', this.externalVaultPath);
+            console.log('External vault path set to:', this.externalVaultPath);
+            console.log('Has external access:', this.hasExternalAccess);
             return this.hasExternalAccess;
         } catch (error) {
             console.error('Failed to access external vault:', error);
@@ -511,6 +528,85 @@ class VaultServiceClass {
         }
     }
 
+    /**
+     * Check if app has all files access (MANAGE_EXTERNAL_STORAGE)
+     * Returns true if we can read external storage directories
+     */
+    async checkAllFilesAccess(): Promise<boolean> {
+        if (Platform.OS !== 'android') return false;
+
+        try {
+            // Try to read a known directory to test access
+            const testPath = EXTERNAL_VAULT_PATHS.OBSIDIAN;
+            const exists = await RNFS.exists(testPath);
+            if (!exists) return false;
+
+            const items = await RNFS.readDir(testPath);
+            console.log('All files access test - items found:', items.length);
+            return items.length > 0;
+        } catch (e) {
+            console.log('All files access test failed:', e);
+            return false;
+        }
+    }
+
+    /**
+     * Run storage diagnostics
+     */
+    async runDiagnostics(): Promise<string> {
+        if (Platform.OS !== 'android') return 'Not Android';
+
+        const logs: string[] = [];
+        const log = (msg: string) => {
+            console.log('[Diagnostics]', msg);
+            logs.push(msg);
+        };
+
+        try {
+            log('Running storage diagnostics...');
+
+            // 1. Check Root Access
+            const rootPath = '/storage/emulated/0';
+            try {
+                const rootItems = await RNFS.readDir(rootPath);
+                log(`Root listing (${rootPath}): Found ${rootItems.length} items.`);
+                if (rootItems.length > 0) {
+                    log(`First item: ${rootItems[0].name} (${rootItems[0].isDirectory() ? 'DIR' : 'FILE'})`);
+                }
+            } catch (e) {
+                log(`FAILED to list root: ${e}`);
+            }
+
+            // 2. Check Obsidian Folder
+            const obsidianPath = EXTERNAL_VAULT_PATHS.OBSIDIAN;
+            try {
+                const exists = await RNFS.exists(obsidianPath);
+                log(`Obsidian path (${obsidianPath}) exists: ${exists}`);
+
+                if (exists) {
+                    const items = await RNFS.readDir(obsidianPath);
+                    log(`Obsidian folder content: Found ${items.length} items.`);
+                    items.forEach(i => log(` - ${i.name}`));
+                }
+            } catch (e) {
+                log(`FAILED to list Obsidian: ${e}`);
+            }
+
+            // 3. Check Permissions Status
+            try {
+                const readPerm = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE);
+                const writePerm = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE);
+                log(`Permission Status - READ: ${readPerm}, WRITE: ${writePerm}`);
+            } catch (e) {
+                log(`Error checking permissions: ${e}`);
+            }
+
+            return logs.join('\n');
+        } catch (error) {
+            log(`Critical diagnostic fail: ${error}`);
+            return logs.join('\n');
+        }
+    }
     /**
      * List files from external Pixel Vault
      */
@@ -577,6 +673,181 @@ class VaultServiceClass {
         } catch (error) {
             console.error('Failed to read external file:', error);
             return null;
+        }
+    }
+
+    /**
+     * Get a random memory (capture or decision) to spark serendipity
+     */
+    async getRandomMemory(): Promise<MemorySpark | null> {
+        try {
+            const captures = await this.listItems('capture');
+            const decisions = await this.listItems('decision');
+            const allItems = [...captures, ...decisions];
+
+            if (allItems.length === 0) return null;
+
+            // Filter out very short items to avoid noise
+            const candidates = allItems.filter(item => item.content.length > 20);
+
+            if (candidates.length === 0) return null;
+
+            const randomItem = candidates[Math.floor(Math.random() * candidates.length)];
+
+            return {
+                id: randomItem.id,
+                title: randomItem.title,
+                content: randomItem.content,
+                date: randomItem.createdAt
+            };
+        } catch (error) {
+            console.error('Failed to get random memory:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Search the vault for items matching a query
+     */
+    async search(query: string): Promise<VaultItem[]> {
+        if (!query || query.trim().length === 0) return [];
+
+        try {
+            const allItems = await this.listItems();
+            const lowerQuery = query.toLowerCase();
+
+            return allItems.filter(item =>
+                item.title.toLowerCase().includes(lowerQuery) ||
+                item.content.toLowerCase().includes(lowerQuery) ||
+                (item.tags && item.tags.some(tag => tag.toLowerCase().includes(lowerQuery)))
+            );
+        } catch (error) {
+            console.error('Search failed:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Get graph data for visualization
+     * Scans external vault for markdown files and extracts [[links]]
+     */
+    async getGraphData(): Promise<{ nodes: any[], links: any[] }> {
+        if (!this.externalVaultPath) {
+            await this.requestExternalAccess();
+        }
+
+        if (!this.externalVaultPath) {
+            return { nodes: [], links: [] };
+        }
+
+        const nodes: any[] = [];
+        const links: any[] = [];
+        const fileNames = new Set<string>();
+        const folderPaths = new Set<string>();
+        let filesScanned = 0;
+        const MAX_FILES = 1000; // Increased for visual density
+
+        console.log('Starting graph scan from:', this.externalVaultPath);
+
+        const scanRecursive = async (currentPath: string, depth: number = 0, parentId: string | null = null, topFolder: string = 'Root') => {
+            if (depth > 6 || filesScanned > MAX_FILES) return;
+
+            try {
+                const files = await RNFS.readDir(currentPath);
+
+                let currentFolderId = parentId;
+
+                if (depth > 0) {
+                    const folderName = depth === 0 ? 'Root' : (currentPath.split('/').pop() || 'Unknown');
+                    const folderId = `dir_${currentPath}`;
+                    currentFolderId = folderId;
+
+                    if (!folderPaths.has(folderId)) {
+                        folderPaths.add(folderId);
+
+                        // Group Hash based on full path for maximum color variety
+                        let pathHash = 0;
+                        for (let i = 0; i < currentPath.length; i++) pathHash = currentPath.charCodeAt(i) + ((pathHash << 5) - pathHash);
+                        const group = Math.abs(pathHash % 6) + 1;
+
+                        nodes.push({
+                            id: folderId,
+                            label: folderName,
+                            group,
+                            type: 'folder',
+                            radius: 12 + Math.max(0, 4 - depth)
+                        });
+
+                        // Link to Parent
+                        if (parentId) {
+                            links.push({ source: parentId, target: folderId, type: 'structure' });
+                        }
+                    }
+                }
+
+                for (const file of files) {
+                    if (file.name.startsWith('.')) continue;
+                    if (filesScanned > MAX_FILES) break;
+
+                    if (file.isDirectory()) {
+                        const nextFolder = depth === 0 ? file.name : topFolder;
+                        // Use currentFolderId as parent for children
+                        await scanRecursive(file.path, depth + 1, currentFolderId, nextFolder);
+                    } else if (file.name.endsWith('.md')) {
+                        filesScanned++;
+                        const name = file.name.replace('.md', '');
+                        fileNames.add(name);
+
+                        let fileHash = 0;
+                        for (let i = 0; i < file.path.length; i++) fileHash = file.path.charCodeAt(i) + ((fileHash << 5) - fileHash);
+                        const group = Math.abs(fileHash % 6) + 1;
+
+                        nodes.push({
+                            id: name,
+                            group,
+                            folder: topFolder,
+                            type: 'file',
+                            path: file.path // Critical for navigation
+                        });
+
+                        // Link to Folder
+                        if (currentFolderId) {
+                            links.push({ source: currentFolderId, target: name, type: 'structure' });
+                        }
+
+                        try {
+                            const content = await RNFS.readFile(file.path, 'utf8');
+                            const linkMatches = content.matchAll(/\[\[(.*?)\]\]/g);
+                            for (const match of linkMatches) {
+                                links.push({ source: name, target: match[1].split('|')[0], type: 'semantic' });
+                            }
+                        } catch {
+                            // ignore
+                        }
+                    }
+                }
+            } catch {
+                // ignore
+            }
+        };
+
+        try {
+            await scanRecursive(this.externalVaultPath);
+            console.log(`[VaultService] Graph scan complete: ${nodes.length} nodes, ${links.length} links`);
+
+            // CRITICAL: D3 will crash if any link source/target is missing from the nodes array.
+            // We must filter all links against the final node set.
+            const validNodeIds = new Set(nodes.map(n => n.id));
+            const validLinks = links.filter(l =>
+                validNodeIds.has(l.source) &&
+                validNodeIds.has(l.target)
+            );
+
+            console.log(`[VaultService] Final filtered graph: ${nodes.length} nodes, ${validLinks.length} links`);
+            return { nodes, links: validLinks };
+        } catch (error) {
+            console.error('[VaultService] Failed to extract graph data:', error);
+            return { nodes: [], links: [] };
         }
     }
 

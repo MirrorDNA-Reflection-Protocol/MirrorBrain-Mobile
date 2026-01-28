@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle, Platform } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
-import { colors, borderRadius, spacing } from '../theme';
+import { borderRadius } from '../theme';
 
 interface GlassViewProps {
     children: React.ReactNode;
@@ -24,16 +24,24 @@ export const GlassView: React.FC<GlassViewProps> = ({
         subtle: styles.containerSubtle,
     };
 
+    // Fallback backgrounds for when blur fails (common on some Android devices)
+    const fallbackBg = {
+        default: 'rgba(20, 25, 40, 0.85)',
+        prominent: 'rgba(30, 35, 55, 0.9)',
+        subtle: 'rgba(15, 20, 35, 0.75)',
+    };
+
     return (
-        <View style={[styles.container, variantStyles[variant], style]}>
+        <View style={[styles.container, variantStyles[variant], { backgroundColor: fallbackBg[variant] }, style]}>
             {/* Glow effect behind */}
             <View style={styles.glowLayer} />
 
+            {/* BlurView - may fail silently on some devices, fallback bg handles this */}
             <BlurView
                 style={StyleSheet.absoluteFill}
                 blurType={blurType}
                 blurAmount={blurAmount}
-                reducedTransparencyFallbackColor="rgba(20, 25, 40, 0.85)"
+                reducedTransparencyFallbackColor={fallbackBg[variant]}
             />
 
             {/* Inner highlight border */}
@@ -91,6 +99,7 @@ const styles = StyleSheet.create({
     },
     content: {
         zIndex: 1,
+        flex: 1,
     },
 });
 

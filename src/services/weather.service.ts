@@ -127,22 +127,56 @@ class WeatherServiceClass {
     }
 
     /**
-     * Refresh weather from API (placeholder)
+     * Refresh weather from API
      */
     async refresh(): Promise<WeatherData> {
-        // TODO: Implement actual API call to Open-Meteo or wttr.in
-        // For now, just get mock data
-        const weather = this.getMockWeather();
-
-        // Cache it
-        this.cached = weather;
         try {
-            await AsyncStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(weather));
-        } catch (error) {
-            console.warn('Weather cache write failed:', error);
-        }
+            // Fetch from Open-Meteo (Free, no key, Paul's location in Goa)
+            const response = await fetch(
+                'https://api.open-meteo.com/v1/forecast?latitude=15.2993&longitude=74.1240&current=temperature_2m,relative_humidity_2m,weather_code&timezone=Asia%2FKolkata'
+            );
 
-        return weather;
+            if (!response.ok) {
+                throw new Error(`Weather API returned ${response.status}`);
+            }
+
+            const data = await response.json();
+            const current = data.current;
+
+            const weather: WeatherData = {
+                temperature: Math.round(current.temperature_2m),
+                condition: this.mapWeatherCode(current.weather_code),
+                humidity: current.relative_humidity_2m,
+                location: 'Goa',
+                updatedAt: new Date(),
+            };
+
+            // Cache it
+            this.cached = weather;
+            await AsyncStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(weather));
+
+            console.log('Weather refreshed from API:', weather.temperature, '°C');
+            return weather;
+        } catch (error) {
+            console.warn('Weather refresh failed, using mock fallback:', error);
+            return this.getMockWeather();
+        }
+    }
+
+    /**
+     * Map WMO code to our internal condition
+     */
+    private mapWeatherCode(code: number): WeatherData['condition'] {
+        if (code === 0) return 'sunny';
+        if (code <= 3) return 'partly_cloudy';
+        if (code <= 48) return 'foggy';
+        if (code <= 57) return 'rainy';
+        if (code <= 67) return 'rainy';
+        if (code <= 77) return 'snowy';
+        if (code <= 82) return 'rainy';
+        if (code <= 86) return 'snowy';
+        if (code >= 95) return 'stormy';
+        return 'cloudy';
     }
 }
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { colors, spacing } from '../theme';
+import { spacing } from '../theme';
 import { AppLauncherService } from '../services';
 import { HapticService } from '../services';
 
@@ -9,23 +9,30 @@ interface AppShortcut {
     label: string;
     icon: string;
     color: string;
-    packageName?: string;
+    packageName: string;
 }
 
-const SHORTCUTS: AppShortcut[] = [
-    { id: 'vault', label: 'Vault', icon: '🗄️', color: '#6366F1', packageName: 'md.obsidian' },
-    { id: 'camera', label: 'Camera', icon: '📷', color: '#3B82F6', packageName: 'com.google.android.camera' },
-    { id: 'files', label: 'Files', icon: '📁', color: '#10B981', packageName: 'com.google.android.apps.nbu.files' },
-    { id: 'notes', label: 'Notes', icon: '📝', color: '#F59E0B', packageName: 'com.google.android.keep' },
-];
-
 export const AppGridWidget: React.FC = () => {
+    const [shortcuts, setShortcuts] = React.useState<AppShortcut[]>([]);
+
+    React.useEffect(() => {
+        const contextualApps = AppLauncherService.getContextualShortcuts(4);
+        const mappedShortcuts: AppShortcut[] = contextualApps.map(app => ({
+            id: app.packageName,
+            label: app.label,
+            icon: app.icon || '📱',
+            color: getAppColor(app.packageName),
+            packageName: app.packageName
+        }));
+        setShortcuts(mappedShortcuts);
+    }, []);
+
     const handlePress = async (app: AppShortcut) => {
         HapticService.tap();
         if (app.packageName) {
             try {
                 await AppLauncherService.launchApp(app.packageName);
-            } catch (error) {
+            } catch {
                 console.log(`Could not launch ${app.label}`);
             }
         }
@@ -34,17 +41,36 @@ export const AppGridWidget: React.FC = () => {
     return (
         <View style={styles.container}>
             <View style={styles.row}>
-                {SHORTCUTS.slice(0, 2).map((app) => (
+                {shortcuts.slice(0, 2).map((app) => (
                     <AppIcon key={app.id} app={app} onPress={() => handlePress(app)} />
                 ))}
             </View>
             <View style={styles.row}>
-                {SHORTCUTS.slice(2, 4).map((app) => (
+                {shortcuts.slice(2, 4).map((app) => (
                     <AppIcon key={app.id} app={app} onPress={() => handlePress(app)} />
                 ))}
             </View>
         </View>
     );
+};
+
+// Helper to get consistent colors for apps
+const getAppColor = (packageName: string): string => {
+    const colors_map: Record<string, string> = {
+        'com.android.chrome': '#4285F4',
+        'com.google.android.apps.messaging': '#34A853',
+        'com.google.android.dialer': '#EA4335',
+        'com.google.android.apps.photos': '#FBBC05',
+        'com.google.android.gm': '#D93025',
+        'com.google.android.calendar': '#4285F4',
+        'com.google.android.apps.maps': '#34A853',
+        'com.spotify.music': '#1DB954',
+        'org.telegram.messenger': '#0088CC',
+        'com.whatsapp': '#25D366',
+        'md.obsidian': '#7C3AED',
+        'com.android.settings': '#6B7280',
+    };
+    return colors_map[packageName] || '#6366F1';
 };
 
 interface AppIconProps {

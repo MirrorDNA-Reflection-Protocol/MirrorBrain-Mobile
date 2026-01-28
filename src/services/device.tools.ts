@@ -10,9 +10,9 @@ import { DeviceService } from './device.service';
 import { HapticService } from './haptic.service';
 import { AppLauncherService } from './applauncher.service';
 import { VaultService } from './vault.service';
-import { CalendarService } from './calendar.service';
+import { CalendarService, type CalendarEvent } from './calendar.service';
 import { WeatherService } from './weather.service';
-import { ContactsService } from './contacts.service';
+import { ContactsService, type PriorityContact } from './contacts.service';
 
 /**
  * Create and register all local device tools
@@ -72,8 +72,8 @@ export function registerDeviceTools(): void {
             execute: async (params) => {
                 const name = params.name as string;
                 const success = await AppLauncherService.launchApp(name);
-                return { 
-                    success, 
+                return {
+                    success,
                     data: { launched: name },
                     error: success ? undefined : `Could not launch ${name}`,
                     retryable: false, // Don't retry app launches
@@ -90,10 +90,10 @@ export function registerDeviceTools(): void {
             description: 'List installed apps',
             parameters: { type: 'object', properties: {} },
             execute: async () => {
-                const apps = await AppLauncherService.getInstalledApps();
+                const apps = AppLauncherService.getFavoriteApps();
                 return {
                     success: true,
-                    data: apps.slice(0, 15).map(a => ({ name: a.name, pkg: a.packageName })),
+                    data: apps.slice(0, 15).map(a => ({ name: a.label, pkg: a.packageName })),
                 };
             },
             source: 'local',
@@ -115,7 +115,7 @@ export function registerDeviceTools(): void {
             execute: async (params) => {
                 const content = params.content as string;
                 const title = (params.title as string) || 'Quick Capture';
-                await VaultService.saveCapture({ type: 'note', content, title });
+                await VaultService.saveCapture('note', content, title);
                 return { success: true, data: { saved: title } };
             },
             source: 'local',
@@ -124,23 +124,25 @@ export function registerDeviceTools(): void {
 
         // Calendar — local only
         {
-            name: 'get_events',
+            name: 'get_events', // Renamed from get_events to check_schedule in the snippet, but keeping original name as per instruction context
             description: 'Get upcoming calendar events',
             parameters: {
                 type: 'object',
                 properties: {
-                    hours: { type: 'number', description: 'Hours ahead (default 24)' },
+                    // Removed 'hours' parameter as getTodayEvents doesn't use it
                 },
             },
-            execute: async (params) => {
-                const hours = (params.hours as number) || 24;
-                const events = await CalendarService.getUpcomingEvents(hours);
+            execute: async (_params) => {
+                // const hours = (params.hours as number) || 24; // Removed hours logic
+                const events = await CalendarService.getTodayEvents(); // Updated method call
                 return {
                     success: true,
-                    data: events.slice(0, 5).map(e => ({
+                    data: events.slice(0, 5).map((e: CalendarEvent) => ({ // Updated map function and added type
                         title: e.title,
-                        start: e.startDate,
+                        time: CalendarService.formatEventTime(e), // New field
+                        location: e.location // New field
                     })),
+                    formatted: `You have ${events.length} events today.` // Added formatted field
                 };
             },
             source: 'local',
@@ -149,20 +151,18 @@ export function registerDeviceTools(): void {
 
         // Weather — REQUIRES NETWORK
         {
-            name: 'get_weather',
+            name: 'get_weather', // Renamed from get_weather to check_weather in the snippet, but keeping original name as per instruction context
             description: 'Get current weather',
             parameters: { type: 'object', properties: {} },
             execute: async () => {
-                const weather = await WeatherService.getCurrentWeather();
+                const weather = await WeatherService.getWeather(); // Updated method call
                 if (!weather) {
                     return { success: false, error: 'Weather unavailable', retryable: true };
                 }
                 return {
                     success: true,
-                    data: {
-                        condition: weather.condition,
-                        temp: weather.temperature,
-                    },
+                    data: weather, // Updated data structure
+                    formatted: `It's ${weather.temperature}°C and ${weather.condition} in ${weather.location || 'your location'}.` // Added formatted field
                 };
             },
             source: 'local',
@@ -173,14 +173,15 @@ export function registerDeviceTools(): void {
 
         // Contacts — local only
         {
-            name: 'get_contacts',
+            name: 'get_contacts', // Renamed from get_contacts to list_contacts in the snippet, but keeping original name as per instruction context
             description: 'Get priority contacts',
             parameters: { type: 'object', properties: {} },
             execute: async () => {
-                const contacts = await ContactsService.getPriorityContacts();
+                const contacts = await ContactsService.getContacts(); // Updated method call
                 return {
                     success: true,
-                    data: contacts.slice(0, 5).map(c => ({ name: c.name })),
+                    data: contacts.slice(0, 5).map((c: PriorityContact) => ({ name: c.name })), // Updated map function and added type
+                    formatted: `Found ${contacts.length} priority contacts.` // Added formatted field
                 };
             },
             source: 'local',

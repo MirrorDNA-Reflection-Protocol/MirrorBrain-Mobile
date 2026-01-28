@@ -5,7 +5,7 @@
  * Makes MirrorBrain a true home screen launcher.
  */
 
-import { NativeModules, Linking, Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 export interface InstalledApp {
     packageName: string;
@@ -38,6 +38,37 @@ class AppLauncherServiceClass {
     }
 
     /**
+     * Get contextual shortcuts for the NOW screen based on time of day
+     */
+    getContextualShortcuts(limit: number = 4): InstalledApp[] {
+        const hour = new Date().getHours();
+
+        // Contextual buckets based on daily rhythm
+        let preferredPackages: string[] = [];
+
+        if (hour >= 5 && hour < 10) { // Morning (5 AM - 10 AM)
+            preferredPackages = ['com.spotify.music', 'com.google.android.calendar', 'com.google.android.gm', 'com.android.chrome'];
+        } else if (hour >= 10 && hour < 18) { // Work Hours (10 AM - 6 PM)
+            preferredPackages = ['md.obsidian', 'com.google.android.calendar', 'org.telegram.messenger', 'com.google.android.gm'];
+        } else if (hour >= 18 && hour < 22) { // Evening (6 PM - 10 PM)
+            preferredPackages = ['com.whatsapp', 'com.spotify.music', 'com.google.android.apps.photos', 'com.android.chrome'];
+        } else { // Night (10 PM - 5 AM)
+            preferredPackages = ['com.whatsapp', 'com.google.android.apps.messaging', 'com.google.android.dialer', 'com.android.settings'];
+        }
+
+        return preferredPackages
+            .map(pkg => {
+                const app = FAVORITE_APPS.find(a => a.packageName === pkg);
+                return {
+                    packageName: pkg,
+                    label: app?.label || 'App',
+                    icon: this.getAppIcon(pkg)
+                };
+            })
+            .slice(0, limit);
+    }
+
+    /**
      * Launch an app by package name
      */
     async launchApp(packageName: string): Promise<boolean> {
@@ -46,9 +77,6 @@ class AppLauncherServiceClass {
                 console.log('App launch only works on Android');
                 return false;
             }
-
-            // Use intent URL to launch app
-            const url = `intent:#Intent;package=${packageName};end`;
 
             // Try standard approach first
             const canOpen = await Linking.canOpenURL(`package:${packageName}`);

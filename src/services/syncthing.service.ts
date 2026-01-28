@@ -22,7 +22,6 @@ export interface LANServerStatus {
 }
 
 const SYNCTHING_CONFIG_KEY = '@mirrorbrain/syncthing';
-const LAN_SERVER_KEY = '@mirrorbrain/lan_server';
 
 class SyncthingServiceClass {
     private config: {
