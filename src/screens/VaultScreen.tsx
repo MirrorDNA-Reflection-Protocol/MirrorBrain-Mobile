@@ -449,6 +449,17 @@ export const VaultScreen: React.FC<VaultScreenProps> = ({ onLockSwipe }) => {
                                     try { await Linking.openURL(url); } catch { }
                                 }}
                             />
+                            {/* Floating exit button for graph mode */}
+                            <TouchableOpacity
+                                style={styles.exitGraphButton}
+                                onPress={() => {
+                                    HapticService.select();
+                                    setViewMode('list');
+                                    onLockSwipe?.(false);
+                                }}
+                            >
+                                <Text style={styles.exitGraphText}>← Exit Graph</Text>
+                            </TouchableOpacity>
                         </Animated.View>
                     )}
                     {/* Sync buttons */}
@@ -657,6 +668,22 @@ const styles = StyleSheet.create({
     viewToggleText: {
         ...typography.labelSmall,
         color: colors.textPrimary,
+    },
+    exitGraphButton: {
+        position: 'absolute',
+        bottom: spacing.lg,
+        left: spacing.lg,
+        backgroundColor: colors.accentDark,
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.md,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: colors.accentLight,
+    },
+    exitGraphText: {
+        ...typography.labelMedium,
+        color: colors.textPrimary,
+        fontWeight: '600',
     },
 
     // Search

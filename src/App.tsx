@@ -1,10 +1,11 @@
 /**
  * MirrorBrain Mobile — Root App Component
- * 
+ *
  * Sovereign launcher with 4 panels:
  * NOW → ASK → VAULT → ACTIONS
- * 
+ *
  * Navigation: Horizontal swipe between panels. NOW is home.
+ * Floating draggable pill nav can be moved anywhere on screen.
  */
 
 import React, { useRef, useState, useCallback, useEffect } from 'react';
@@ -15,10 +16,11 @@ import {
     Dimensions,
     ScrollView,
     StatusBar,
-    SafeAreaView,
     TouchableOpacity,
     NativeSyntheticEvent,
     NativeScrollEvent,
+    Animated,
+    PanResponder,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { NowScreen, AskScreen, VaultScreen, ActionsScreen } from './screens';
@@ -31,7 +33,7 @@ import {
 import { colors, typography, spacing, glyphs } from './theme';
 import type { PanelName } from './types';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface Panel {
     key: PanelName;
@@ -48,6 +50,41 @@ export const App: React.FC = () => {
     const [showIdentityModal, setShowIdentityModal] = useState(false);
     const [isGraphActive, setIsGraphActive] = useState(false);
     const [panelHeight, setPanelHeight] = useState(0);
+
+    // Draggable nav position
+    const pan = useRef(new Animated.ValueXY({ x: (SCREEN_WIDTH - 280) / 2, y: 60 })).current;
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gestureState) => {
+                // Only capture drag if moved more than 5px (avoids capturing taps)
+                return Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5;
+            },
+            onPanResponderGrant: () => {
+                pan.setOffset({
+                    x: (pan.x as any)._value,
+                    y: (pan.y as any)._value,
+                });
+                pan.setValue({ x: 0, y: 0 });
+            },
+            onPanResponderMove: Animated.event(
+                [null, { dx: pan.x, dy: pan.y }],
+                { useNativeDriver: false }
+            ),
+            onPanResponderRelease: () => {
+                pan.flattenOffset();
+                // Clamp to screen bounds
+                const x = Math.max(10, Math.min((pan.x as any)._value, SCREEN_WIDTH - 290));
+                const y = Math.max(40, Math.min((pan.y as any)._value, SCREEN_HEIGHT - 100));
+                Animated.spring(pan, {
+                    toValue: { x, y },
+                    useNativeDriver: false,
+                    friction: 7,
+                }).start();
+            },
+        })
+    ).current;
 
     // Initialize services on mount
     useEffect(() => {
@@ -139,15 +176,62 @@ export const App: React.FC = () => {
             colors={[colors.gradientStart, colors.gradientEnd]}
             style={styles.container}
         >
-            <SafeAreaView style={styles.contentContainer}>
-                <StatusBar
-                    barStyle="light-content"
-                    backgroundColor={colors.gradientStart}
-                    translucent={false}
-                />
+            <StatusBar
+                barStyle="light-content"
+                backgroundColor={colors.gradientStart}
+                translucent={false}
+            />
 
-                {/* Top navigation bar */}
-                <View style={styles.navBar}>
+            {/* Full-screen panel content */}
+            <View
+                style={styles.contentContainer}
+                onLayout={(e) => setPanelHeight(e.nativeEvent.layout.height)}
+            >
+                {panelHeight > 0 && (
+                    <ScrollView
+                        ref={scrollViewRef}
+                        horizontal
+                        pagingEnabled
+                        scrollEnabled={currentPanel !== 'VAULT' || !isGraphActive}
+                        showsHorizontalScrollIndicator={false}
+                        bounces={false}
+                        onMomentumScrollEnd={handleScrollEnd}
+                        scrollEventThrottle={16}
+                    >
+                        {panels.map((panel) => (
+                            <View key={panel.key} style={{ width: SCREEN_WIDTH, height: panelHeight }}>
+                                {panel.component}
+                            </View>
+                        ))}
+                    </ScrollView>
+                )}
+            </View>
+
+            {/* Floating draggable navigation pill */}
+            <Animated.View
+                style={[
+                    styles.floatingNav,
+                    {
+                        transform: [
+                            { translateX: pan.x },
+                            { translateY: pan.y },
+                        ],
+                    },
+                ]}
+                {...panResponder.panHandlers}
+            >
+                {/* Progress bar inside pill */}
+                <View style={styles.progressContainer}>
+                    <View
+                        style={[
+                            styles.progressBar,
+                            { width: `${((currentIndex + 1) / panels.length) * 100}%` }
+                        ]}
+                    />
+                </View>
+
+                {/* Nav items */}
+                <View style={styles.navItems}>
                     {panels.map((panel, index) => (
                         <TouchableOpacity
                             key={panel.key}
@@ -156,6 +240,7 @@ export const App: React.FC = () => {
                                 currentPanel === panel.key && styles.navItemActive,
                             ]}
                             onPress={() => scrollToPanel(index)}
+                            activeOpacity={0.7}
                         >
                             <Text style={[
                                 styles.navGlyph,
@@ -173,55 +258,23 @@ export const App: React.FC = () => {
                     ))}
                 </View>
 
-                {/* Progress indicator */}
-                <View style={styles.progressContainer}>
-                    <View
-                        style={[
-                            styles.progressBar,
-                            { width: `${((currentIndex + 1) / panels.length) * 100}%` }
-                        ]}
-                    />
+                {/* Drag handle indicator */}
+                <View style={styles.dragHandle} />
+            </Animated.View>
+
+            {/* Swipe hint for first-time users */}
+            {currentIndex === 0 && (
+                <View style={styles.swipeHint}>
+                    <Text style={styles.swipeHintText}>← Swipe to explore →</Text>
                 </View>
+            )}
 
-                {/* Horizontal panel navigation */}
-                <View
-                    style={{ flex: 1 }}
-                    onLayout={(e) => setPanelHeight(e.nativeEvent.layout.height)}
-                >
-                    {panelHeight > 0 && (
-                        <ScrollView
-                            ref={scrollViewRef}
-                            horizontal
-                            pagingEnabled
-                            scrollEnabled={currentPanel !== 'VAULT' || !isGraphActive}
-                            showsHorizontalScrollIndicator={false}
-                            bounces={false}
-                            onMomentumScrollEnd={handleScrollEnd}
-                            scrollEventThrottle={16}
-                        >
-                            {panels.map((panel) => (
-                                <View key={panel.key} style={{ width: SCREEN_WIDTH, height: panelHeight }}>
-                                    {panel.component}
-                                </View>
-                            ))}
-                        </ScrollView>
-                    )}
-                </View>
-
-                {/* Swipe hint for first-time users */}
-                {currentIndex === 0 && (
-                    <View style={styles.swipeHint}>
-                        <Text style={styles.swipeHintText}>← Swipe to explore →</Text>
-                    </View>
-                )}
-
-                {/* Identity import modal */}
-                <IdentityImportModal
-                    visible={showIdentityModal}
-                    onClose={() => setShowIdentityModal(false)}
-                    onImportComplete={handleIdentityImported}
-                />
-            </SafeAreaView>
+            {/* Identity import modal */}
+            <IdentityImportModal
+                visible={showIdentityModal}
+                onClose={() => setShowIdentityModal(false)}
+                onImportComplete={handleIdentityImported}
+            />
         </LinearGradient>
     );
 };
@@ -233,12 +286,32 @@ const styles = StyleSheet.create({
     contentContainer: {
         flex: 1,
     },
-    // Navigation bar
-    navBar: {
+
+    // Floating navigation pill
+    floatingNav: {
+        position: 'absolute',
+        width: 280,
+        backgroundColor: 'rgba(20, 20, 25, 0.95)',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: colors.accentPrimary,
+        shadowColor: colors.accentPrimary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.4,
+        shadowRadius: 12,
+        elevation: 15,
+        overflow: 'hidden',
+    },
+    progressContainer: {
+        height: 3,
+        backgroundColor: colors.surface,
+    },
+    progressBar: {
+        height: '100%',
+        backgroundColor: colors.accentPrimary,
+    },
+    navItems: {
         flexDirection: 'row',
-        backgroundColor: colors.glass.background, // Glass effect
-        borderColor: colors.glass.border,
-        borderBottomWidth: 1,
         paddingVertical: spacing.sm,
         paddingHorizontal: spacing.xs,
     },
@@ -246,13 +319,13 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         paddingVertical: spacing.xs,
-        borderRadius: 8,
+        borderRadius: 12,
     },
     navItemActive: {
-        backgroundColor: colors.surfaceElevated,
+        backgroundColor: colors.accentDark,
     },
     navGlyph: {
-        fontSize: 16,
+        fontSize: 18,
         color: colors.textMuted,
         marginBottom: 2,
     },
@@ -262,20 +335,19 @@ const styles = StyleSheet.create({
     navLabel: {
         ...typography.labelSmall,
         color: colors.textMuted,
-        fontSize: 10,
+        fontSize: 9,
     },
     navLabelActive: {
         color: colors.textPrimary,
     },
-
-    // Progress indicator
-    progressContainer: {
-        height: 2,
-        backgroundColor: colors.surface,
-    },
-    progressBar: {
-        height: '100%',
-        backgroundColor: colors.accentPrimary,
+    dragHandle: {
+        width: 40,
+        height: 4,
+        backgroundColor: colors.textMuted,
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginBottom: spacing.xs,
+        opacity: 0.5,
     },
 
     // Swipe hint
