@@ -13,6 +13,12 @@ import { VaultService } from './vault.service';
 import { CalendarService, type CalendarEvent } from './calendar.service';
 import { WeatherService } from './weather.service';
 import { ContactsService, type PriorityContact } from './contacts.service';
+import {
+    PassiveIntelligenceService,
+    ClipboardWatcher,
+    NotificationInterceptor,
+    ScreenContext,
+} from './passive.service';
 
 /**
  * Create and register all local device tools
@@ -182,6 +188,110 @@ export function registerDeviceTools(): void {
                     success: true,
                     data: contacts.slice(0, 5).map((c: PriorityContact) => ({ name: c.name })), // Updated map function and added type
                     formatted: `Found ${contacts.length} priority contacts.` // Added formatted field
+                };
+            },
+            source: 'local',
+            requiresNetwork: false,
+        },
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Passive Intelligence Tools
+        // ─────────────────────────────────────────────────────────────────────
+
+        // Clipboard — read current clipboard
+        {
+            name: 'get_clipboard',
+            description: 'Get current clipboard content',
+            parameters: { type: 'object', properties: {} },
+            execute: async () => {
+                const text = await ClipboardWatcher.getCurrent();
+                return {
+                    success: true,
+                    data: { text: text || '(empty)' },
+                    formatted: text ? `Clipboard contains: "${text.slice(0, 100)}${text.length > 100 ? '...' : ''}"` : 'Clipboard is empty.',
+                };
+            },
+            source: 'local',
+            requiresNetwork: false,
+        },
+
+        // Notifications — get active notifications
+        {
+            name: 'get_notifications',
+            description: 'Get active device notifications',
+            parameters: { type: 'object', properties: {} },
+            execute: async () => {
+                const enabled = await NotificationInterceptor.isEnabled();
+                if (!enabled) {
+                    return {
+                        success: false,
+                        error: 'Notification access not enabled. User needs to enable in Settings.',
+                        retryable: false,
+                    };
+                }
+                const notifications = await NotificationInterceptor.getActive();
+                return {
+                    success: true,
+                    data: notifications.slice(0, 10).map(n => ({
+                        app: n.appName,
+                        title: n.title,
+                        text: n.text?.slice(0, 100),
+                    })),
+                    formatted: `You have ${notifications.length} active notifications.`,
+                };
+            },
+            source: 'local',
+            requiresNetwork: false,
+        },
+
+        // Screen context — what am I looking at?
+        {
+            name: 'get_screen_context',
+            description: 'Get context about what is currently on screen (requires accessibility service)',
+            parameters: { type: 'object', properties: {} },
+            execute: async () => {
+                const enabled = await ScreenContext.isEnabled();
+                if (!enabled) {
+                    return {
+                        success: false,
+                        error: 'Screen context service not enabled. User needs to enable MirrorBrain in Accessibility settings.',
+                        retryable: false,
+                    };
+                }
+                const context = await ScreenContext.getContext();
+                if (!context) {
+                    return { success: false, error: 'Could not get screen context', retryable: true };
+                }
+                return {
+                    success: true,
+                    data: {
+                        app: context.appName,
+                        summary: context.summary?.slice(0, 500),
+                    },
+                    formatted: `Currently viewing ${context.appName}. ${context.summary?.slice(0, 200) || ''}`,
+                };
+            },
+            source: 'local',
+            requiresNetwork: false,
+        },
+
+        // Passive status — check what's enabled
+        {
+            name: 'get_passive_status',
+            description: 'Check status of passive intelligence features (clipboard, notifications, screen context)',
+            parameters: { type: 'object', properties: {} },
+            execute: async () => {
+                const status = await PassiveIntelligenceService.getStatus();
+                const features = [];
+                if (status.clipboardEnabled) features.push('clipboard');
+                if (status.notificationEnabled) features.push('notifications');
+                if (status.screenContextEnabled) features.push('screen context');
+                return {
+                    success: true,
+                    data: status,
+                    formatted: features.length > 0
+                        ? `Passive intelligence enabled: ${features.join(', ')}.`
+                        : 'No passive intelligence features enabled.',
                 };
             },
             source: 'local',

@@ -48,6 +48,37 @@
           android:exported="false"
           android:foregroundServiceType="dataSync" />
 
+      <!-- Passive Intelligence: Notification Interceptor -->
+      <service
+          android:name="com.mirrorbrainmobile.passive.NotificationInterceptorService"
+          android:label="MirrorBrain Notifications"
+          android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+          android:exported="false">
+          <intent-filter>
+              <action android:name="android.service.notification.NotificationListenerService" />
+          </intent-filter>
+      </service>
+
+      <!-- Passive Intelligence: Headless JS task for notification processing -->
+      <service
+          android:name="com.mirrorbrainmobile.passive.NotificationTaskService"
+          android:enabled="true"
+          android:exported="false" />
+
+      <!-- Passive Intelligence: Screen Context Accessibility -->
+      <service
+          android:name="com.mirrorbrainmobile.passive.ScreenContextService"
+          android:label="MirrorBrain Screen Reader"
+          android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+          android:exported="false">
+          <intent-filter>
+              <action android:name="android.accessibilityservice.AccessibilityService" />
+          </intent-filter>
+          <meta-data
+              android:name="android.accessibilityservice"
+              android:resource="@xml/accessibility_service_config" />
+      </service>
+
       <activity
         android:name=".MainActivity"
         android:label="@string/app_name"

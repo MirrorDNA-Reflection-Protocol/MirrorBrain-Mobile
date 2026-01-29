@@ -23,3 +23,15 @@ export { registerDeviceTools, getRegisteredToolNames } from './device.tools';
 export { A2ABridge, type DeviceIdentity, type RemoteDevice } from './a2a.bridge';
 export { SearchService, type SearchResult, type SearchResponse } from './search.service';
 
+// Passive Intelligence
+export {
+    PassiveIntelligenceService,
+    ClipboardWatcher,
+    NotificationInterceptor,
+    ScreenContext,
+    type ClipboardCapture,
+    type NotificationData,
+    type ScreenContext as ScreenContextType,
+    type PassiveStatus,
+} from './passive.service';
+

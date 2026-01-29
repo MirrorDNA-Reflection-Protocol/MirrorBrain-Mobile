@@ -29,6 +29,7 @@ import {
     VaultService,
     IdentityService,
     registerDeviceTools,
+    PassiveIntelligenceService,
 } from './services';
 import { colors, typography, spacing, glyphs } from './theme';
 import type { PanelName } from './types';
@@ -102,6 +103,9 @@ export const App: React.FC = () => {
 
             // Register all device tools with orchestrator
             registerDeviceTools();
+
+            // Initialize passive intelligence (clipboard watcher starts automatically)
+            await PassiveIntelligenceService.initialize();
 
             // If no identity, prompt to import on first launch
             if (!hasIdentity) {
