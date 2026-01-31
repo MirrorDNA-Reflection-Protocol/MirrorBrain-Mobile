@@ -141,7 +141,7 @@ export const NowScreen: React.FC<NowScreenProps> = () => {
 
 const styles = StyleSheet.create({
     scrollView: { flex: 1 },
-    scrollContent: { padding: spacing.lg, paddingTop: spacing.xl },
+    scrollContent: { padding: spacing.lg, paddingTop: spacing.xxl },
 
     header: {
         marginBottom: spacing.xl,

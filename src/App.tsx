@@ -1,17 +1,13 @@
 /**
  * MirrorBrain Mobile — Root App Component
  *
- * Sovereign launcher with 4 panels:
- * NOW → ASK → VAULT → ACTIONS
- *
- * Navigation: Horizontal swipe between panels. NOW is home.
- * Floating draggable pill nav can be moved anywhere on screen.
+ * Sovereign launcher with 4 panels.
+ * Navigation: Swipe. Minimal dot indicator.
  */
 
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
     View,
-    Text,
     StyleSheet,
     Dimensions,
     ScrollView,
@@ -19,10 +15,7 @@ import {
     TouchableOpacity,
     NativeSyntheticEvent,
     NativeScrollEvent,
-    Animated,
-    PanResponder,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import { NowScreen, AskScreen, VaultScreen, ActionsScreen } from './screens';
 import { IdentityImportModal } from './components';
 import {
@@ -30,16 +23,15 @@ import {
     IdentityService,
     registerDeviceTools,
     PassiveIntelligenceService,
+    MobileBusService,
 } from './services';
-import { colors, typography, spacing, glyphs } from './theme';
+import { colors, spacing } from './theme';
 import type { PanelName } from './types';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface Panel {
     key: PanelName;
-    label: string;
-    glyph: string;
     component: React.ReactNode;
 }
 
@@ -52,64 +44,22 @@ export const App: React.FC = () => {
     const [isGraphActive, setIsGraphActive] = useState(false);
     const [panelHeight, setPanelHeight] = useState(0);
 
-    // Draggable nav position
-    const pan = useRef(new Animated.ValueXY({ x: (SCREEN_WIDTH - 280) / 2, y: 60 })).current;
-
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onMoveShouldSetPanResponder: (_, gestureState) => {
-                // Only capture drag if moved more than 5px (avoids capturing taps)
-                return Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5;
-            },
-            onPanResponderGrant: () => {
-                pan.setOffset({
-                    x: (pan.x as any)._value,
-                    y: (pan.y as any)._value,
-                });
-                pan.setValue({ x: 0, y: 0 });
-            },
-            onPanResponderMove: Animated.event(
-                [null, { dx: pan.x, dy: pan.y }],
-                { useNativeDriver: false }
-            ),
-            onPanResponderRelease: () => {
-                pan.flattenOffset();
-                // Clamp to screen bounds
-                const x = Math.max(10, Math.min((pan.x as any)._value, SCREEN_WIDTH - 290));
-                const y = Math.max(40, Math.min((pan.y as any)._value, SCREEN_HEIGHT - 100));
-                Animated.spring(pan, {
-                    toValue: { x, y },
-                    useNativeDriver: false,
-                    friction: 7,
-                }).start();
-            },
-        })
-    ).current;
-
-    // Initialize services on mount
     useEffect(() => {
         initializeApp();
     }, []);
 
     const initializeApp = async () => {
         try {
-            // Initialize vault storage
             await VaultService.initialize();
-
-            // Check for existing identity
             const hasIdentity = IdentityService.hasIdentity();
             setIdentityLoaded(hasIdentity);
-
-            // Register all device tools with orchestrator
             registerDeviceTools();
-
-            // Initialize passive intelligence (clipboard watcher starts automatically)
             await PassiveIntelligenceService.initialize();
 
-            // If no identity, prompt to import on first launch
+            // Initialize Mobile Bus for hub communication
+            await MobileBusService.initialize();
+
             if (!hasIdentity) {
-                // Small delay to let UI render first
                 setTimeout(() => setShowIdentityModal(true), 1000);
             }
         } catch (error) {
@@ -126,16 +76,9 @@ export const App: React.FC = () => {
     };
 
     const panels: Panel[] = [
-        {
-            key: 'NOW',
-            label: 'NOW',
-            glyph: glyphs.truth,
-            component: <NowScreen isOnline={isOnline} />,
-        },
+        { key: 'NOW', component: <NowScreen isOnline={isOnline} /> },
         {
             key: 'ASK',
-            label: 'ASK',
-            glyph: glyphs.synthesis,
             component: (
                 <AskScreen
                     isOnline={isOnline}
@@ -144,18 +87,8 @@ export const App: React.FC = () => {
                 />
             ),
         },
-        {
-            key: 'VAULT',
-            label: 'VAULT',
-            glyph: glyphs.pattern,
-            component: <VaultScreen onLockSwipe={setIsGraphActive} />,
-        },
-        {
-            key: 'ACTIONS',
-            label: 'ACTIONS',
-            glyph: glyphs.decision,
-            component: <ActionsScreen />,
-        },
+        { key: 'VAULT', component: <VaultScreen onLockSwipe={setIsGraphActive} /> },
+        { key: 'ACTIONS', component: <ActionsScreen /> },
     ];
 
     const handleScrollEnd = useCallback(
@@ -176,17 +109,14 @@ export const App: React.FC = () => {
     const currentIndex = panels.findIndex(p => p.key === currentPanel);
 
     return (
-        <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            style={styles.container}
-        >
+        <View style={styles.container}>
             <StatusBar
                 barStyle="light-content"
-                backgroundColor={colors.gradientStart}
+                backgroundColor="#000000"
                 translucent={false}
             />
 
-            {/* Full-screen panel content */}
+            {/* Panel content */}
             <View
                 style={styles.contentContainer}
                 onLayout={(e) => setPanelHeight(e.nativeEvent.layout.height)}
@@ -211,165 +141,73 @@ export const App: React.FC = () => {
                 )}
             </View>
 
-            {/* Floating draggable navigation pill */}
-            <Animated.View
-                style={[
-                    styles.floatingNav,
-                    {
-                        transform: [
-                            { translateX: pan.x },
-                            { translateY: pan.y },
-                        ],
-                    },
-                ]}
-                {...panResponder.panHandlers}
-            >
-                {/* Progress bar inside pill */}
-                <View style={styles.progressContainer}>
-                    <View
-                        style={[
-                            styles.progressBar,
-                            { width: `${((currentIndex + 1) / panels.length) * 100}%` }
-                        ]}
-                    />
-                </View>
-
-                {/* Nav items */}
-                <View style={styles.navItems}>
+            {/* Ultra-minimal dot indicator */}
+            <View style={styles.navContainer}>
+                <View style={styles.dotsRow}>
                     {panels.map((panel, index) => (
                         <TouchableOpacity
                             key={panel.key}
-                            style={[
-                                styles.navItem,
-                                currentPanel === panel.key && styles.navItemActive,
-                            ]}
                             onPress={() => scrollToPanel(index)}
+                            style={styles.dotTouch}
                             activeOpacity={0.7}
                         >
-                            <Text style={[
-                                styles.navGlyph,
-                                currentPanel === panel.key && styles.navGlyphActive,
-                            ]}>
-                                {panel.glyph}
-                            </Text>
-                            <Text style={[
-                                styles.navLabel,
-                                currentPanel === panel.key && styles.navLabelActive,
-                            ]}>
-                                {panel.label}
-                            </Text>
+                            <View
+                                style={[
+                                    styles.dot,
+                                    currentIndex === index && styles.dotActive,
+                                ]}
+                            />
                         </TouchableOpacity>
                     ))}
                 </View>
+            </View>
 
-                {/* Drag handle indicator */}
-                <View style={styles.dragHandle} />
-            </Animated.View>
-
-            {/* Swipe hint for first-time users */}
-            {currentIndex === 0 && (
-                <View style={styles.swipeHint}>
-                    <Text style={styles.swipeHintText}>← Swipe to explore →</Text>
-                </View>
-            )}
-
-            {/* Identity import modal */}
             <IdentityImportModal
                 visible={showIdentityModal}
                 onClose={() => setShowIdentityModal(false)}
                 onImportComplete={handleIdentityImported}
             />
-        </LinearGradient>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#000000',
     },
     contentContainer: {
         flex: 1,
     },
 
-    // Floating navigation pill
-    floatingNav: {
-        position: 'absolute',
-        width: 280,
-        backgroundColor: 'rgba(20, 20, 25, 0.95)',
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: colors.accentPrimary,
-        shadowColor: colors.accentPrimary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
-        elevation: 15,
-        overflow: 'hidden',
+    // Ultra-minimal navigation
+    navContainer: {
+        backgroundColor: '#000000',
+        paddingBottom: 28, // Clear of gesture bar
+        paddingTop: 12,
     },
-    progressContainer: {
-        height: 3,
-        backgroundColor: colors.surface,
-    },
-    progressBar: {
-        height: '100%',
-        backgroundColor: colors.accentPrimary,
-    },
-    navItems: {
+    dotsRow: {
         flexDirection: 'row',
-        paddingVertical: spacing.sm,
-        paddingHorizontal: spacing.xs,
-    },
-    navItem: {
-        flex: 1,
+        justifyContent: 'center',
         alignItems: 'center',
-        paddingVertical: spacing.xs,
-        borderRadius: 12,
+        gap: 12,
     },
-    navItemActive: {
-        backgroundColor: colors.accentDark,
+    dotTouch: {
+        padding: 8,
     },
-    navGlyph: {
-        fontSize: 18,
-        color: colors.textMuted,
-        marginBottom: 2,
-    },
-    navGlyphActive: {
-        color: colors.accentPrimary,
-    },
-    navLabel: {
-        ...typography.labelSmall,
-        color: colors.textMuted,
-        fontSize: 9,
-    },
-    navLabelActive: {
-        color: colors.textPrimary,
-    },
-    dragHandle: {
-        width: 40,
-        height: 4,
+    dot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
         backgroundColor: colors.textMuted,
-        borderRadius: 2,
-        alignSelf: 'center',
-        marginBottom: spacing.xs,
-        opacity: 0.5,
+        opacity: 0.4,
     },
-
-    // Swipe hint
-    swipeHint: {
-        position: 'absolute',
-        bottom: spacing.xl,
-        left: 0,
-        right: 0,
-        alignItems: 'center',
-    },
-    swipeHintText: {
-        ...typography.labelSmall,
-        color: colors.textMuted,
-        backgroundColor: colors.surface,
-        paddingVertical: spacing.xs,
-        paddingHorizontal: spacing.md,
-        borderRadius: 12,
-        overflow: 'hidden',
+    dotActive: {
+        backgroundColor: '#f59e0b', // Amber from branding
+        opacity: 1,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
     },
 });
 

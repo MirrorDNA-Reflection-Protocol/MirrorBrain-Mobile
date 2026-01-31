@@ -7,3 +7,4 @@ export * from './WeatherWidget';
 export * from './AppGridWidget';
 export * from './IdentityPulseWidget';
 export * from './IdentityImportModal';
+export * from './Logo';

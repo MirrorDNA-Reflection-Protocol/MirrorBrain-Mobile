@@ -24,18 +24,20 @@ class DeviceServiceClass {
     /**
      * Get current battery level using react-native-device-info
      * Returns real device battery on Android and iOS
+     * Note: Always fetches fresh - no caching
      */
     async getBatteryLevel(): Promise<BatteryInfo> {
         try {
-            const level = await DeviceInfo.getBatteryLevel();
+            // Force fresh readings (no caching in device-info, but log for debug)
+            const rawLevel = await DeviceInfo.getBatteryLevel();
             const charging = await DeviceInfo.isBatteryCharging();
+            const level = Math.round(rawLevel * 100);
 
-            return {
-                level: Math.round(level * 100), // API returns 0-1, convert to 0-100
-                charging,
-            };
+            console.log(`[DeviceService] Battery: raw=${rawLevel}, level=${level}%, charging=${charging}`);
+
+            return { level, charging };
         } catch (error) {
-            console.warn('Battery read failed:', error);
+            console.warn('[DeviceService] Battery read failed:', error);
             return { level: -1, charging: false };
         }
     }

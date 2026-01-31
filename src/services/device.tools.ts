@@ -19,6 +19,7 @@ import {
     NotificationInterceptor,
     ScreenContext,
 } from './passive.service';
+import { MobileBusService } from './bus.service';
 
 /**
  * Create and register all local device tools
@@ -28,13 +29,15 @@ export function registerDeviceTools(): void {
         // Device info — local only
         {
             name: 'get_battery',
-            description: 'Get battery level and charging status',
+            description: 'Get current battery level and charging status',
             parameters: { type: 'object', properties: {} },
             execute: async () => {
                 const info = await DeviceService.getBatteryLevel();
+                const chargingText = info.charging ? ' and charging' : '';
                 return {
                     success: true,
                     data: { level: info.level, charging: info.charging },
+                    formatted: `Battery is at ${info.level}%${chargingText}.`,
                 };
             },
             source: 'local',
@@ -292,6 +295,76 @@ export function registerDeviceTools(): void {
                     formatted: features.length > 0
                         ? `Passive intelligence enabled: ${features.join(', ')}.`
                         : 'No passive intelligence features enabled.',
+                };
+            },
+            source: 'local',
+            requiresNetwork: false,
+        },
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Mobile Bus Tools — Hub Communication
+        // ─────────────────────────────────────────────────────────────────────
+
+        // Send health report to hub
+        {
+            name: 'send_health_report',
+            description: 'Send device health report to the hub (battery, storage, status)',
+            parameters: { type: 'object', properties: {} },
+            execute: async () => {
+                await MobileBusService.sendHealthReport();
+                return {
+                    success: true,
+                    data: { sent: true },
+                    formatted: 'Health report sent to hub.',
+                };
+            },
+            source: 'local',
+            requiresNetwork: false,
+        },
+
+        // Check for hub commands
+        {
+            name: 'check_hub_commands',
+            description: 'Check for pending commands from the hub',
+            parameters: { type: 'object', properties: {} },
+            execute: async () => {
+                const { commands } = await MobileBusService.sync();
+                return {
+                    success: true,
+                    data: { count: commands.length, commands },
+                    formatted: commands.length > 0
+                        ? `${commands.length} pending commands from hub.`
+                        : 'No pending commands from hub.',
+                };
+            },
+            source: 'local',
+            requiresNetwork: false,
+        },
+
+        // Send alert to hub
+        {
+            name: 'send_alert',
+            description: 'Send an alert to the hub',
+            parameters: {
+                type: 'object',
+                properties: {
+                    level: {
+                        type: 'string',
+                        description: 'Alert level: warning, alert, or critical',
+                        enum: ['warning', 'alert', 'critical'],
+                    },
+                    message: { type: 'string', description: 'Alert message' },
+                },
+                required: ['level', 'message'],
+            },
+            execute: async (params) => {
+                const level = params.level as 'warning' | 'alert' | 'critical';
+                const message = params.message as string;
+                await MobileBusService.sendAlert(level, message);
+                return {
+                    success: true,
+                    data: { level, message },
+                    formatted: `Alert sent to hub: [${level.toUpperCase()}] ${message}`,
                 };
             },
             source: 'local',

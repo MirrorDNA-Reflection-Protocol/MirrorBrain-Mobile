@@ -14,6 +14,7 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
+    Pressable,
     KeyboardAvoidingView,
     Platform,
     Modal,
@@ -434,6 +435,7 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                 style={styles.chatArea}
                 contentContainerStyle={styles.chatContent}
                 onContentSizeChange={() => scrollViewRef.current?.scrollToEnd()}
+                keyboardShouldPersistTaps="handled"
             >
                 {messages.length === 0 ? (
                     <View style={styles.emptyState}>
@@ -537,20 +539,27 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                     onChangeText={setInput}
                     multiline
                     maxLength={2000}
-                    returnKeyType="send"
+                    blurOnSubmit={false}
+                    submitBehavior="submit"
                     onSubmitEditing={handleSend}
                 />
-                <TouchableOpacity
-                    style={[styles.sendButton, (!input.trim() || isGenerating || isAgentRunning) && styles.sendButtonDisabled]}
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.sendButton,
+                        (!input.trim() || isGenerating || isAgentRunning) && styles.sendButtonDisabled,
+                        pressed && { opacity: 0.7 }
+                    ]}
                     onPress={handleSend}
                     disabled={!input.trim() || isGenerating || isAgentRunning}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    delayLongPress={500}
                 >
                     {(isGenerating || isAgentRunning) ? (
                         <ActivityIndicator size="small" color={colors.textPrimary} />
                     ) : (
                         <Text style={styles.sendButtonText}>→</Text>
                     )}
-                </TouchableOpacity>
+                </Pressable>
             </View>
 
             {/* Voice Overlay */}
@@ -704,8 +713,8 @@ const styles = StyleSheet.create({
     onlineBanner: { backgroundColor: colors.online, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, alignItems: 'center' },
     onlineBannerText: { ...typography.labelMedium, color: colors.background },
 
-    // Header
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, paddingBottom: spacing.md },
+    // Header - extra top padding for various notch sizes
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md },
     headerLeft: { flexDirection: 'row', alignItems: 'center' },
     glyph: { fontSize: 24, color: colors.glyphSynthesis, marginRight: spacing.sm },
     title: { ...typography.displayLarge, color: colors.textPrimary },

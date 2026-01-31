@@ -79,7 +79,10 @@ ANSWER: [response]
 
 Rules: One action per turn. Be concise. If a tool fails twice, answer without it.`;
 
-const ACTION_REGEX = /ACTION:\s*(\w+)\s*(\{[\s\S]*?\})/;
+// Support both JSON params and function-call style: ACTION: tool_name {"x":1} OR ACTION: tool_name() OR ACTION: tool_name
+const ACTION_REGEX_JSON = /ACTION:\s*(\w+)\s*(\{[\s\S]*?\})/;
+const ACTION_REGEX_PAREN = /ACTION:\s*(\w+)\s*\(\s*\)/;
+const ACTION_REGEX_BARE = /ACTION:\s*(\w+)(?:\s|$)/;
 const THOUGHT_REGEX = /THOUGHT:\s*([\s\S]*?)(?=ACTION:|ANSWER:|$)/;
 const ANSWER_REGEX = /ANSWER:\s*([\s\S]*?)$/;
 
@@ -193,6 +196,7 @@ class OrchestratorServiceClass {
 
     /**
      * Parse LLM response for thought/action/answer
+     * Priority: If ACTION is present, ignore ANSWER (it's likely hallucinated)
      */
     private parseResponse(text: string): {
         thought?: string;
@@ -200,26 +204,51 @@ class OrchestratorServiceClass {
         answer?: string;
     } {
         const thoughtMatch = text.match(THOUGHT_REGEX);
-        const actionMatch = text.match(ACTION_REGEX);
         const answerMatch = text.match(ANSWER_REGEX);
 
+        // Try multiple action formats
         let action: { tool: string; params: Record<string, unknown> } | undefined;
 
-        if (actionMatch) {
+        // Try JSON params first: ACTION: tool_name {"param": "value"}
+        const jsonMatch = text.match(ACTION_REGEX_JSON);
+        if (jsonMatch) {
             try {
                 action = {
-                    tool: actionMatch[1],
-                    params: JSON.parse(actionMatch[2]),
+                    tool: jsonMatch[1],
+                    params: JSON.parse(jsonMatch[2]),
                 };
             } catch {
-                console.warn('[Orchestrator] Failed to parse action params');
+                console.warn('[Orchestrator] Failed to parse JSON action params');
             }
         }
 
+        // Try parenthesis format: ACTION: tool_name()
+        if (!action) {
+            const parenMatch = text.match(ACTION_REGEX_PAREN);
+            if (parenMatch) {
+                action = {
+                    tool: parenMatch[1],
+                    params: {},
+                };
+            }
+        }
+
+        // Try bare format: ACTION: tool_name
+        if (!action) {
+            const bareMatch = text.match(ACTION_REGEX_BARE);
+            if (bareMatch) {
+                action = {
+                    tool: bareMatch[1],
+                    params: {},
+                };
+            }
+        }
+
+        // If there's an ACTION, ignore any ANSWER (it's hallucinated without tool result)
         return {
             thought: thoughtMatch?.[1]?.trim(),
             action,
-            answer: answerMatch?.[1]?.trim(),
+            answer: action ? undefined : answerMatch?.[1]?.trim(),
         };
     }
 
@@ -256,13 +285,74 @@ class OrchestratorServiceClass {
     }
 
     /**
+     * Find closest matching tool name (handles LLM typos)
+     */
+    private findTool(name: string): Tool | undefined {
+        // Exact match first
+        if (this.tools.has(name)) {
+            return this.tools.get(name);
+        }
+
+        // Fuzzy match - find tool that starts with or contains the name
+        const lowerName = name.toLowerCase();
+        for (const [toolName, tool] of this.tools) {
+            // Check if tool name starts with the input or input starts with tool name
+            if (toolName.startsWith(lowerName) || lowerName.startsWith(toolName.replace('get_', 'ge_'))) {
+                console.log(`[Orchestrator] Fuzzy matched "${name}" to "${toolName}"`);
+                return tool;
+            }
+            // Check edit distance for close matches (1-2 char difference)
+            if (this.isCloseName(name, toolName)) {
+                console.log(`[Orchestrator] Close match "${name}" to "${toolName}"`);
+                return tool;
+            }
+        }
+        return undefined;
+    }
+
+    /**
+     * Check if two names are within 2 character edits
+     */
+    private isCloseName(a: string, b: string): boolean {
+        if (Math.abs(a.length - b.length) > 2) return false;
+        let diff = 0;
+        const longer = a.length >= b.length ? a : b;
+        const shorter = a.length < b.length ? a : b;
+        for (let i = 0; i < longer.length && diff <= 2; i++) {
+            if (shorter[i] !== longer[i]) diff++;
+        }
+        return diff <= 2;
+    }
+
+    /**
+     * Clean raw LLM response - strip THOUGHT/ACTION prefixes for user display
+     */
+    private cleanResponse(text: string): string {
+        // Remove THOUGHT: prefix and content
+        let cleaned = text.replace(/THOUGHT:\s*[\s\S]*?(?=ACTION:|ANSWER:|$)/gi, '').trim();
+        // Remove ACTION: prefix and content
+        cleaned = cleaned.replace(/ACTION:\s*\w+\s*\{[\s\S]*?\}/gi, '').trim();
+        cleaned = cleaned.replace(/ACTION:\s*\w+\s*\(\s*\)/gi, '').trim();
+        // Extract ANSWER: content if present
+        const answerMatch = cleaned.match(/ANSWER:\s*([\s\S]*)/i);
+        if (answerMatch) {
+            return answerMatch[1].trim();
+        }
+        // If nothing meaningful left, return a fallback
+        if (!cleaned || cleaned.length < 10) {
+            return "I'm working on that. Please try again.";
+        }
+        return cleaned;
+    }
+
+    /**
      * Execute a tool with timeout and retry logic
      */
     private async executeTool(
         toolName: string,
         params: Record<string, unknown>
     ): Promise<ToolResult> {
-        const tool = this.tools.get(toolName);
+        const tool = this.findTool(toolName);
 
         if (!tool) {
             return { success: false, error: `Unknown tool: ${toolName}`, retryable: false };
@@ -383,7 +473,9 @@ class OrchestratorServiceClass {
             }
 
             totalTokens += result.totalTokens;
+            console.log(`[Orchestrator] LLM output (iter ${iterations}):`, result.text.slice(0, 200));
             const parsed = this.parseResponse(result.text);
+            console.log(`[Orchestrator] Parsed:`, JSON.stringify({ thought: !!parsed.thought, action: parsed.action?.tool, answer: !!parsed.answer }));
 
             if (parsed.thought) {
                 onThought?.(parsed.thought);
@@ -408,16 +500,18 @@ class OrchestratorServiceClass {
 
             // Action requested
             if (parsed.action) {
+                console.log(`[Orchestrator] Executing tool: ${parsed.action.tool}`);
                 onAction?.(parsed.action.tool, parsed.action.params);
 
                 const toolResult = await this.executeTool(
                     parsed.action.tool,
                     parsed.action.params
                 );
+                console.log(`[Orchestrator] Tool result:`, toolResult.success ? 'success' : toolResult.error);
 
-                // Compact observation to save tokens
+                // Use formatted response if available, otherwise JSON data
                 const observation = toolResult.success
-                    ? JSON.stringify(toolResult.data).slice(0, 500)
+                    ? ((toolResult as any).formatted || JSON.stringify(toolResult.data)).slice(0, 500)
                     : `Error: ${toolResult.error}`;
 
                 // Add to working context (not permanent history)
@@ -435,16 +529,17 @@ class OrchestratorServiceClass {
                 continue;
             }
 
-            // No action or answer — treat raw response as final
+            // No action or answer — clean up raw response for display
+            const cleanedAnswer = this.cleanResponse(result.text);
             this.history.push({
                 role: 'assistant',
-                content: result.text,
+                content: cleanedAnswer,
                 timestamp: new Date(),
             });
 
             return {
-                thought: parsed.thought || result.text,
-                finalAnswer: result.text,
+                thought: parsed.thought || '',
+                finalAnswer: cleanedAnswer,
                 tokensUsed: totalTokens,
                 iterations,
                 failedTools: this.getExhaustedTools(),

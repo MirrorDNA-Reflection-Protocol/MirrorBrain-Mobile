@@ -35,3 +35,21 @@ export {
     type PassiveStatus,
 } from './passive.service';
 
+// SC1 Local Agent — Sovereign Intelligence Daemon
+export {
+    LocalAgentService,
+    type AgentState,
+    type HealthReport,
+    type Alert,
+    type AgentTask,
+    type Trigger,
+} from './localagent.service';
+
+// Mobile Bus — Hub Communication
+export {
+    MobileBusService,
+    type MobileState,
+    type HubCommand,
+    type BusState,
+} from './bus.service';
+

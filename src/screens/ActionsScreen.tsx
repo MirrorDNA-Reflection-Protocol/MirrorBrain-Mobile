@@ -392,7 +392,8 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: spacing.lg,
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.xl,
         paddingBottom: spacing.md,
     },
     glyph: {
