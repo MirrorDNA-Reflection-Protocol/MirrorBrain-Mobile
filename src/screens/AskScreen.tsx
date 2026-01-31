@@ -25,7 +25,7 @@ import { colors, typography, spacing, glyphs } from '../theme';
 import { useLLM } from '../hooks';
 import { VaultService, IdentityService, HapticSymphony, VoiceService, SearchService, OrchestratorService } from '../services';
 import type { SearchResult, MemorySpark } from '../services';
-import { BrowserPane, SearchResultCard } from '../components';
+import { BrowserPane, SearchResultCard, Logo } from '../components';
 import { RefineButton } from '../components/RefineButton';
 import type { AskMode, ChatMessage, SessionClosure } from '../types';
 
@@ -407,7 +407,7 @@ export const AskScreen: React.FC<AskScreenProps> = ({
             {/* Header */}
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
-                    <Text style={styles.glyph}>{glyphs.synthesis}</Text>
+                    <Logo size={32} showGlow={isGenerating || isAgentRunning} animated={isGenerating || isAgentRunning} />
                     <Text style={styles.title}>ASK</Text>
                 </View>
                 <TouchableOpacity style={styles.modelButton} onPress={() => setShowModelModal(true)}>

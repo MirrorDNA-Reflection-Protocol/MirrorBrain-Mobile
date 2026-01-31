@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 
 import { colors, typography, spacing } from '../theme';
-import { GlassView, WeatherWidget, AppGridWidget, IdentityPulseWidget } from '../components';
+import { GlassView, WeatherWidget, AppGridWidget, IdentityPulseWidget, Logo } from '../components';
 import {
     CalendarService,
     HapticService,
@@ -88,6 +88,10 @@ export const NowScreen: React.FC<NowScreenProps> = () => {
         >
             {/* Header / Greeting */}
             <View style={styles.header}>
+                <View style={styles.headerRow}>
+                    <Logo size={40} showGlow animated style={styles.logo} />
+                    <Text style={styles.brandText}>Active Mirror</Text>
+                </View>
                 <Text style={styles.dateDisplay}>{timeStr} • {dayName} {dateStr}</Text>
                 <Text style={styles.greetingText}>{getGreeting()}</Text>
             </View>
@@ -145,6 +149,20 @@ const styles = StyleSheet.create({
 
     header: {
         marginBottom: spacing.xl,
+    },
+    headerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: spacing.md,
+    },
+    logo: {
+        marginRight: spacing.sm,
+    },
+    brandText: {
+        ...typography.headlineMedium,
+        color: colors.accentPrimary,
+        fontWeight: '600',
+        letterSpacing: 1,
     },
     dateDisplay: {
         ...typography.labelMedium,
