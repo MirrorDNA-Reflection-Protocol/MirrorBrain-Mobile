@@ -159,10 +159,12 @@ export const AskScreen: React.FC<AskScreenProps> = ({
     };
 
     const handleSend = async () => {
+        console.log('[AskScreen] handleSend called, input:', input);
         if (!input.trim()) return;
 
         // Capture and clear input immediately for responsive UX
         const messageText = input.trim();
+        console.log('[AskScreen] Sending message:', messageText);
         setInput('');
         setStreamingText('');
 
@@ -541,28 +543,28 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                     placeholderTextColor={isListening ? colors.accentPrimary : colors.textMuted}
                     value={input}
                     onChangeText={setInput}
-                    multiline
-                    maxLength={2000}
-                    blurOnSubmit={false}
-                    submitBehavior="submit"
+                    maxLength={500}
+                    returnKeyType="send"
                     onSubmitEditing={handleSend}
                 />
-                <Pressable
-                    style={({ pressed }) => [
+                <TouchableOpacity
+                    style={[
                         styles.sendButton,
                         (!input.trim() || isGenerating || isAgentRunning) && styles.sendButtonDisabled,
-                        pressed && { opacity: 0.7 }
                     ]}
-                    onPressIn={handleSend}
+                    onPress={() => {
+                        console.log('[AskScreen] Send button pressed');
+                        handleSend();
+                    }}
                     disabled={!input.trim() || isGenerating || isAgentRunning}
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    activeOpacity={0.7}
                 >
                     {(isGenerating || isAgentRunning) ? (
                         <ActivityIndicator size="small" color={colors.textPrimary} />
                     ) : (
                         <Text style={styles.sendButtonText}>→</Text>
                     )}
-                </Pressable>
+                </TouchableOpacity>
             </View>
 
             {/* Voice Overlay */}

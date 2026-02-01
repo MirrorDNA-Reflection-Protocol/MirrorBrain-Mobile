@@ -109,6 +109,32 @@ export function registerDeviceTools(): void {
             requiresNetwork: false,
         },
 
+        // Storage info — local only
+        {
+            name: 'get_storage',
+            description: 'Get device storage information (free space, total space)',
+            parameters: { type: 'object', properties: {} },
+            execute: async () => {
+                try {
+                    const RNFS = require('react-native-fs');
+                    const info = await RNFS.getFSInfo();
+                    const freeGb = Math.round((info.freeSpace / (1024 * 1024 * 1024)) * 10) / 10;
+                    const totalGb = Math.round((info.totalSpace / (1024 * 1024 * 1024)) * 10) / 10;
+                    const usedGb = Math.round((totalGb - freeGb) * 10) / 10;
+                    const percentUsed = Math.round((usedGb / totalGb) * 100);
+                    return {
+                        success: true,
+                        data: { freeGb, totalGb, usedGb, percentUsed },
+                        formatted: `Storage: ${usedGb}GB used of ${totalGb}GB (${percentUsed}% full). ${freeGb}GB free.`,
+                    };
+                } catch (error) {
+                    return { success: false, error: 'Could not get storage info' };
+                }
+            },
+            source: 'local',
+            requiresNetwork: false,
+        },
+
         // Vault capture — local only
         {
             name: 'save_note',

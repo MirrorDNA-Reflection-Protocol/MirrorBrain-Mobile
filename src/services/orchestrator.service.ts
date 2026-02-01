@@ -12,6 +12,7 @@
  */
 
 import { LLMService } from './llm.service';
+import { OllamaService } from './ollama.service';
 import type { ChatMessage } from '../types';
 
 // Tool definition — matches MCP schema for future interop
@@ -88,16 +89,37 @@ const ANSWER_REGEX = /ANSWER:\s*([\s\S]*?)$/;
 
 class OrchestratorServiceClass {
     private tools: Map<string, Tool> = new Map();
-    private maxIterations: number = 4; // Reduced from 5 to save context
+    private maxIterations: number = 6; // More iterations for better reasoning
     private history: ChatMessage[] = [];
     private toolFailures: Map<string, ToolFailure> = new Map();
     private isOnline: boolean = true;
+    private useOllama: boolean = true; // Prefer Ollama for smarter inference
+    private ollamaChecked: boolean = false;
 
     /**
      * Set network status
      */
     setNetworkStatus(online: boolean): void {
         this.isOnline = online;
+    }
+
+    /**
+     * Initialize Ollama connection
+     */
+    async initOllama(): Promise<boolean> {
+        if (this.ollamaChecked) return OllamaService.isReady();
+        this.ollamaChecked = true;
+        const available = await OllamaService.checkConnection();
+        console.log('[Orchestrator] Ollama available:', available);
+        return available;
+    }
+
+    /**
+     * Set whether to prefer Ollama
+     */
+    setUseOllama(use: boolean): void {
+        this.useOllama = use;
+        console.log('[Orchestrator] Use Ollama:', use);
     }
 
     /**
@@ -427,15 +449,21 @@ class OrchestratorServiceClass {
         onAction?: (action: string, params: Record<string, unknown>) => void,
         onToken?: (token: string) => void
     ): Promise<OrchestrationResult> {
-        if (!LLMService.isModelLoaded()) {
+        // Check for Ollama first (smarter brain on Mac)
+        const ollamaAvailable = this.useOllama && await this.initOllama();
+
+        // Fall back to local LLM if Ollama not available
+        if (!ollamaAvailable && !LLMService.isModelLoaded()) {
             return {
                 thought: 'No model loaded',
-                finalAnswer: 'I need a model loaded to help you.',
+                finalAnswer: 'I need a model loaded to help you. Or connect to your Mac running Ollama.',
                 tokensUsed: 0,
                 iterations: 0,
                 failedTools: [],
             };
         }
+
+        console.log('[Orchestrator] Using:', ollamaAvailable ? 'Ollama (Mac)' : 'Local LLM');
 
         // Prune history before starting
         this.pruneHistory();
@@ -459,10 +487,30 @@ class OrchestratorServiceClass {
             // Rebuild system prompt (excludes exhausted tools)
             const systemPrompt = this.buildSystemPrompt(systemPromptPrefix);
 
-            // Get LLM response
-            const result = await LLMService.chat(messages, systemPrompt, onToken);
+            // Get LLM response (Ollama or local)
+            let responseText: string | null = null;
 
-            if (!result) {
+            if (ollamaAvailable) {
+                // Use Ollama on Mac for smarter inference
+                const ollamaMessages = [
+                    { role: 'system' as const, content: systemPrompt },
+                    ...messages.map(m => ({
+                        role: m.role as 'user' | 'assistant',
+                        content: m.content,
+                    })),
+                ];
+                responseText = await OllamaService.chat(ollamaMessages, 1024);
+                totalTokens += responseText ? Math.ceil(responseText.length / 4) : 0;
+            } else {
+                // Use local LLM
+                const result = await LLMService.chat(messages, systemPrompt, onToken);
+                if (result) {
+                    responseText = result.text;
+                    totalTokens += result.totalTokens;
+                }
+            }
+
+            if (!responseText) {
                 return {
                     thought: 'LLM failed to respond',
                     finalAnswer: 'Something went wrong with my thinking.',
@@ -472,9 +520,8 @@ class OrchestratorServiceClass {
                 };
             }
 
-            totalTokens += result.totalTokens;
-            console.log(`[Orchestrator] LLM output (iter ${iterations}):`, result.text.slice(0, 200));
-            const parsed = this.parseResponse(result.text);
+            console.log(`[Orchestrator] LLM output (iter ${iterations}):`, responseText.slice(0, 200));
+            const parsed = this.parseResponse(responseText);
             console.log(`[Orchestrator] Parsed:`, JSON.stringify({ thought: !!parsed.thought, action: parsed.action?.tool, answer: !!parsed.answer }));
 
             if (parsed.thought) {
