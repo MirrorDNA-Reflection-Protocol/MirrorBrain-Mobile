@@ -161,18 +161,22 @@ export const AskScreen: React.FC<AskScreenProps> = ({
     const handleSend = async () => {
         if (!input.trim()) return;
 
+        // Capture and clear input immediately for responsive UX
+        const messageText = input.trim();
+        setInput('');
+        setStreamingText('');
+
+        // Dismiss keyboard smoothly after input is captured
         Keyboard.dismiss();
 
         const userMessage: ChatMessage = {
             role: 'user',
-            content: input.trim(),
+            content: messageText,
             timestamp: new Date(),
         };
 
         const newMessages = [...messages, userMessage];
         setMessages(newMessages);
-        setInput('');
-        setStreamingText('');
 
         if (mode === 'MirrorMesh') {
             if (!isModelLoaded) {
@@ -549,10 +553,9 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                         (!input.trim() || isGenerating || isAgentRunning) && styles.sendButtonDisabled,
                         pressed && { opacity: 0.7 }
                     ]}
-                    onPress={handleSend}
+                    onPressIn={handleSend}
                     disabled={!input.trim() || isGenerating || isAgentRunning}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    delayLongPress={500}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 >
                     {(isGenerating || isAgentRunning) ? (
                         <ActivityIndicator size="small" color={colors.textPrimary} />
