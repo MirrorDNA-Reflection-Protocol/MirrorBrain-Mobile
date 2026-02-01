@@ -54,3 +54,136 @@ export {
     type BusState,
 } from './bus.service';
 
+// Session Continuity
+export {
+    SessionService,
+    type SessionData,
+    type SessionMetadata,
+} from './session.service';
+
+// Overlay Service — Floating Bubble
+export {
+    OverlayService,
+    type OverlayQueryEvent,
+    type OverlayQuickActionEvent,
+} from './overlay.service';
+
+// Natural Language Actions
+export {
+    IntentParser,
+    type ParsedIntent,
+    type IntentType,
+    type IntentEntities,
+} from './intent.parser';
+
+export {
+    ActionExecutor,
+    type ActionResult,
+    type ActionHandler,
+} from './action.executor';
+
+// Widget Service
+export {
+    WidgetService,
+    type WidgetData,
+} from './widget.service';
+
+// Nudge Engine
+export {
+    NudgeService,
+    type Nudge,
+    type NudgeType,
+    type NudgePriority,
+    type NudgeAction,
+    type NudgeConfig,
+} from './nudge.service';
+
+// Notification Filter — AI Classification
+export {
+    NotificationFilter,
+    type NotificationCategory,
+    type ClassifiedNotification,
+    type FilterConfig,
+} from './notification.filter';
+
+// OCR Service — Screenshot Text Extraction
+export {
+    OCRService,
+    type OCRResult,
+    type OCRBlock,
+    type OCRLine,
+    type ScreenshotCapture,
+    type ExtractedPatterns,
+} from './ocr.service';
+
+// Automation Service — Cross-App Actions
+export {
+    AutomationService,
+    type ActionResult,
+    type ClickableElement,
+    type ScrollDirection,
+} from './automation.service';
+
+// Geofence Service — Location Triggers
+export {
+    GeofenceService,
+    type GeofenceLocation,
+    type GeofenceOptions,
+    type GeofenceAction,
+    type GeofenceEvent,
+    type LocationPermissionStatus,
+} from './geofence.service';
+
+// Briefing Service — Morning/Evening Rituals
+export {
+    BriefingService,
+    type BriefingType,
+    type Briefing,
+    type BriefingSection,
+    type BriefingItem,
+    type BriefingAction,
+    type DaySummary,
+} from './briefing.service';
+
+// Focus Service — Deep Work & Auto-Responder
+export {
+    FocusService,
+    type FocusStatus,
+    type FocusPreset,
+    type FocusOptions,
+    type FocusEvent,
+} from './focus.service';
+
+// Pattern Service — Behavior Pattern Recognition
+export {
+    PatternService,
+    type Pattern,
+    type PatternType,
+    type PatternContext,
+    type PatternSuggestion,
+} from './pattern.service';
+
+// Behavior Tracker — Event Collection
+export {
+    BehaviorTracker,
+    type TrackedEvent,
+    type EventCategory,
+} from './behavior.tracker';
+
+// Relationship Service — Communication Tracking
+export {
+    RelationshipService,
+    type RelationshipRecord,
+    type RelationshipInsight,
+    type CommunicationEvent,
+} from './relationship.service';
+
+// Digest Service — Weekly Summaries
+export {
+    DigestService,
+    type WeeklyDigest,
+    type DigestSection,
+    type DigestMetric,
+    type DigestItem,
+    type WeeklyStats,
+} from './digest.service';

@@ -2,4 +2,6 @@
     <string name="app_name">MirrorBrainMobile</string>
     <string name="accessibility_service_description">MirrorBrain Screen Reader enables AI-powered context awareness. Ask \"what am I looking at?\" and get intelligent answers about your current screen.</string>
     <string name="notification_service_description">MirrorBrain Notification Intelligence summarizes and routes your notifications using AI.</string>
+    <string name="widget_description">MirrorBrain widget shows status, upcoming events, and provides quick capture.</string>
+    <string name="widget_name">MirrorBrain</string>
 </resources>

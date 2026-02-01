@@ -14,6 +14,7 @@ import {
     AppRegistry,
 } from 'react-native';
 import { VaultService } from './vault.service';
+import { NotificationFilter, ClassifiedNotification } from './notification.filter';
 
 const { PassiveIntelligence } = NativeModules;
 
@@ -176,6 +177,8 @@ class ClipboardWatcherClass {
 
 class NotificationInterceptorClass {
     private onNotification: ((notification: NotificationData) => void) | null = null;
+    private onClassifiedNotification: ((notification: ClassifiedNotification) => void) | null = null;
+    private filterEnabled: boolean = true;
 
     /**
      * Check if notification access is enabled
@@ -203,6 +206,22 @@ class NotificationInterceptorClass {
     }
 
     /**
+     * Get all active notifications, classified
+     */
+    async getActiveClassified(): Promise<ClassifiedNotification[]> {
+        const notifications = await this.getActive();
+        return NotificationFilter.classifyBatch(notifications);
+    }
+
+    /**
+     * Get only important notifications (urgent + important)
+     */
+    async getImportant(): Promise<ClassifiedNotification[]> {
+        const notifications = await this.getActive();
+        return NotificationFilter.filterImportant(notifications);
+    }
+
+    /**
      * Dismiss a notification by its key
      */
     async dismiss(key: string): Promise<boolean> {
@@ -211,7 +230,7 @@ class NotificationInterceptorClass {
     }
 
     /**
-     * Set callback for incoming notifications
+     * Set callback for incoming notifications (raw)
      * (Called from headless JS task)
      */
     setHandler(handler: (notification: NotificationData) => void): void {
@@ -219,11 +238,37 @@ class NotificationInterceptorClass {
     }
 
     /**
+     * Set callback for classified notifications
+     * Called after AI filtering with category info
+     */
+    setClassifiedHandler(handler: (notification: ClassifiedNotification) => void): void {
+        this.onClassifiedNotification = handler;
+    }
+
+    /**
+     * Enable/disable filtering
+     */
+    setFilterEnabled(enabled: boolean): void {
+        this.filterEnabled = enabled;
+    }
+
+    /**
      * Process incoming notification (called from headless task)
      */
-    processNotification(notification: NotificationData): void {
+    async processNotification(notification: NotificationData): Promise<void> {
+        // Raw callback first
         if (this.onNotification) {
             this.onNotification(notification);
+        }
+
+        // Classify and callback
+        if (this.filterEnabled && this.onClassifiedNotification) {
+            try {
+                const classified = await NotificationFilter.classify(notification);
+                this.onClassifiedNotification(classified);
+            } catch (error) {
+                console.error('[NotificationInterceptor] Classification error:', error);
+            }
         }
     }
 }
@@ -323,7 +368,7 @@ const notificationInterceptor = new NotificationInterceptorClass();
 async function NotificationTask(data: { data: string }) {
     try {
         const notification = JSON.parse(data.data) as NotificationData;
-        notificationInterceptor.processNotification(notification);
+        await notificationInterceptor.processNotification(notification);
     } catch (error) {
         console.error('NotificationTask error:', error);
     }

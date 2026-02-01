@@ -1,9 +1,9 @@
 /**
  * ASK Panel — Front Door
  * From Spec Part IV
- * 
+ *
  * Purpose: Single entry point for all cognitive assistance.
- * Every session must terminate with closure.
+ * Sessions continue naturally without forced closure.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -14,26 +14,23 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    Pressable,
     KeyboardAvoidingView,
     Platform,
     Modal,
     ActivityIndicator,
-    Keyboard,
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
-import { useLLM } from '../hooks';
+import { useLLM, useSessionRestore } from '../hooks';
 import { VaultService, IdentityService, HapticSymphony, VoiceService, SearchService, OrchestratorService } from '../services';
 import type { SearchResult, MemorySpark } from '../services';
 import { BrowserPane, SearchResultCard, Logo } from '../components';
 import { RefineButton } from '../components/RefineButton';
-import type { AskMode, ChatMessage, SessionClosure } from '../types';
+import type { AskMode, ChatMessage } from '../types';
 
 // System prompt for MirrorMesh
 const MIRRORMESH_SYSTEM_PROMPT = `You are MirrorMesh, a calm and thoughtful assistant integrated into MirrorBrain Mobile.
 Your role is to help the user think through decisions, understand concepts, or build solutions.
 Be concise but thorough. Never create urgency or anxiety.
-Every session should move toward a closure: Decide, Defer, Next Action, or Pause.
 If the user has identity context, use it to personalize your responses.`;
 
 interface AskScreenProps {
@@ -55,11 +52,6 @@ export const AskScreen: React.FC<AskScreenProps> = ({
     const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
     const scrollViewRef = useRef<ScrollView>(null);
 
-    // Closure modal state
-    const [showClosureModal, setShowClosureModal] = useState(false);
-    const [closureType, setClosureType] = useState<SessionClosure['type'] | null>(null);
-    const [closureInput, setClosureInput] = useState('');
-
     // Agent orchestrator state
     const [isAgentRunning, setIsAgentRunning] = useState(false);
     const [agentStatus, setAgentStatus] = useState('');
@@ -74,6 +66,9 @@ export const AskScreen: React.FC<AskScreenProps> = ({
 
     // Serendipity
     const [spark, setSpark] = useState<MemorySpark | null>(null);
+
+    // Session Restore
+    const [sessionState, sessionActions] = useSessionRestore();
 
     const {
         isModelLoaded,
@@ -149,6 +144,28 @@ export const AskScreen: React.FC<AskScreenProps> = ({
         };
     }, [isGenerating, isAgentRunning]);
 
+    // Save session on message changes
+    useEffect(() => {
+        if (messages.length > 0) {
+            sessionActions.saveSession(messages, mode);
+        }
+    }, [messages, mode, sessionActions]);
+
+    // Handle session restore
+    const handleRestoreSession = async () => {
+        const restored = await sessionActions.restoreSession();
+        if (restored) {
+            setMessages(restored.messages);
+            setMode(restored.mode);
+            HapticSymphony.tap();
+        }
+    };
+
+    const handleStartFresh = async () => {
+        await sessionActions.dismissRestore();
+        HapticSymphony.tap();
+    };
+
     const handleModeChange = (newMode: AskMode) => {
         setMode(newMode);
         if (newMode === 'Online' && mode === 'Online') {
@@ -168,8 +185,8 @@ export const AskScreen: React.FC<AskScreenProps> = ({
         setInput('');
         setStreamingText('');
 
-        // Dismiss keyboard smoothly after input is captured
-        Keyboard.dismiss();
+        // Don't dismiss keyboard - let user keep typing or dismiss manually
+        // This prevents the double-tap issue on Android
 
         const userMessage: ChatMessage = {
             role: 'user',
@@ -309,67 +326,6 @@ export const AskScreen: React.FC<AskScreenProps> = ({
         }
     };
 
-    // Open closure modal with type
-    const openClosureModal = (type: SessionClosure['type']) => {
-        setClosureType(type);
-        setClosureInput('');
-        setShowClosureModal(true);
-    };
-
-    // Execute closure and save session
-    const executeClosure = async () => {
-        if (!closureType) return;
-
-        let closure: SessionClosure;
-        const inputText = closureInput.trim();
-
-        switch (closureType) {
-            case 'decide':
-                closure = {
-                    type: 'decide',
-                    decision: inputText || 'Decision made',
-                    rationale: messages.length > 0
-                        ? messages[messages.length - 1].content.slice(0, 200)
-                        : 'Based on conversation',
-                };
-                break;
-            case 'defer':
-                closure = {
-                    type: 'defer',
-                    reason: inputText || 'Need more information',
-                };
-                break;
-            case 'next':
-                closure = {
-                    type: 'next',
-                    action: inputText || 'Follow up required',
-                };
-                break;
-            case 'pause':
-            default:
-                closure = {
-                    type: 'pause',
-                    note: inputText || undefined,
-                };
-                break;
-        }
-
-        // Haptic confirmation
-        await HapticSymphony.shatter();
-        await new Promise<void>(r => setTimeout(r, 300));
-
-        // Save session to vault
-        await VaultService.saveSession(messages, closure);
-
-        // Close modal and clear session
-        setShowClosureModal(false);
-        setClosureType(null);
-        setClosureInput('');
-        setMessages([]);
-        setStreamingText('');
-        OrchestratorService.clearHistory();
-    };
-
     const handleDownloadModel = async (modelId: 'qwen-2.5-1.5b' | 'smollm2-360m') => {
         setDownloadProgress(0);
 
@@ -385,24 +341,19 @@ export const AskScreen: React.FC<AskScreenProps> = ({
         }
     };
 
-    const getClosurePrompt = (): string => {
-        switch (closureType) {
-            case 'decide': return 'What did you decide?';
-            case 'defer': return 'Why are you deferring?';
-            case 'next': return 'What\'s the next action?';
-            case 'pause': return 'Any notes? (optional)';
-            default: return '';
-        }
-    };
-
-    const hasActiveSession = messages.length > 0;
-
     return (
         <KeyboardAvoidingView
             style={styles.container}
             behavior="padding"
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 60}
         >
+            {/* Outer ScrollView prevents keyboard dismissal on button taps (Android fix) */}
+            <ScrollView
+                style={styles.outerWrapper}
+                contentContainerStyle={styles.outerWrapperContent}
+                scrollEnabled={false}
+                keyboardShouldPersistTaps="always"
+            >
             {/* Online banner */}
             {isOnline && (
                 <TouchableOpacity style={styles.onlineBanner} onPress={onToggleOnline}>
@@ -445,29 +396,52 @@ export const AskScreen: React.FC<AskScreenProps> = ({
             >
                 {messages.length === 0 ? (
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyPrompt}>
-                            {mode === 'MirrorMesh' ? "What are you trying to decide, build, or understand?"
-                                : mode === 'Vault' ? "Search your vault..."
-                                    : "Search the web..."}
-                        </Text>
-                        {identityLoaded && (
-                            <Text style={styles.identityIndicator}>{glyphs.truth} Identity loaded</Text>
+                        {/* Session Restore Prompt */}
+                        {sessionState.showRestorePrompt && sessionState.metadata && (
+                            <View style={styles.restoreCard}>
+                                <Text style={styles.restoreTitle}>Continue where you left off?</Text>
+                                <Text style={styles.restoreSubtitle}>
+                                    {sessionState.metadata.topic || 'Previous session'} ({sessionState.metadata.messageCount} messages)
+                                </Text>
+                                <Text style={styles.restoreTime}>{sessionState.timeSince}</Text>
+                                <View style={styles.restoreButtons}>
+                                    <TouchableOpacity style={styles.restoreButton} onPress={handleRestoreSession}>
+                                        <Text style={styles.restoreButtonText}>Continue</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.restoreButtonSecondary} onPress={handleStartFresh}>
+                                        <Text style={styles.restoreButtonSecondaryText}>Start Fresh</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
                         )}
 
-                        {/* Serendipity Spark */}
-                        {spark && mode === 'MirrorMesh' && (
-                            <TouchableOpacity
-                                style={styles.sparkCard}
-                                onPress={() => setInput(`Let's talk about this memory: "${spark.title}"`)}
-                            >
-                                <View style={styles.sparkHeader}>
-                                    <Text style={styles.sparkIcon}>⚡</Text>
-                                    <Text style={styles.sparkLabel}>MEMORY SPARK</Text>
-                                    <Text style={styles.sparkDate}>{spark.date.toLocaleDateString()}</Text>
-                                </View>
-                                <Text style={styles.sparkTitle}>{spark.title}</Text>
-                                <Text style={styles.sparkPreview} numberOfLines={3}>{spark.content}</Text>
-                            </TouchableOpacity>
+                        {!sessionState.showRestorePrompt && (
+                            <>
+                                <Text style={styles.emptyPrompt}>
+                                    {mode === 'MirrorMesh' ? "What are you trying to decide, build, or understand?"
+                                        : mode === 'Vault' ? "Search your vault..."
+                                            : "Search the web..."}
+                                </Text>
+                                {identityLoaded && (
+                                    <Text style={styles.identityIndicator}>{glyphs.truth} Identity loaded</Text>
+                                )}
+
+                                {/* Serendipity Spark */}
+                                {spark && mode === 'MirrorMesh' && (
+                                    <TouchableOpacity
+                                        style={styles.sparkCard}
+                                        onPress={() => setInput(`Let's talk about this memory: "${spark.title}"`)}
+                                    >
+                                        <View style={styles.sparkHeader}>
+                                            <Text style={styles.sparkIcon}>⚡</Text>
+                                            <Text style={styles.sparkLabel}>MEMORY SPARK</Text>
+                                            <Text style={styles.sparkDate}>{spark.date.toLocaleDateString()}</Text>
+                                        </View>
+                                        <Text style={styles.sparkTitle}>{spark.title}</Text>
+                                        <Text style={styles.sparkPreview} numberOfLines={3}>{spark.content}</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </>
                         )}
                     </View>
                 ) : (
@@ -517,16 +491,6 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                 )}
             </ScrollView>
 
-            {/* Session closure buttons */}
-            {hasActiveSession && mode === 'MirrorMesh' && !isGenerating && !isAgentRunning && (
-                <View style={styles.closureButtons}>
-                    <ClosureButton label="Decide" glyph={glyphs.decision} onPress={() => openClosureModal('decide')} />
-                    <ClosureButton label="Defer" onPress={() => openClosureModal('defer')} />
-                    <ClosureButton label="Next" onPress={() => openClosureModal('next')} />
-                    <ClosureButton label="Pause" onPress={() => openClosureModal('pause')} />
-                </View>
-            )}
-
             {/* Input area */}
             <View style={styles.inputContainer}>
                 <TouchableOpacity style={styles.micButton} onPress={isListening ? handleStopVoice : handleStartVoice}>
@@ -566,6 +530,7 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                     )}
                 </TouchableOpacity>
             </View>
+            </ScrollView>
 
             {/* Voice Overlay */}
             {isListening && (
@@ -576,38 +541,6 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                     </View>
                 </TouchableOpacity>
             )}
-
-            {/* Closure Modal */}
-            <Modal visible={showClosureModal} transparent animationType="fade" onRequestClose={() => setShowClosureModal(false)}>
-                <View style={styles.closureModalOverlay}>
-                    <View style={styles.closureModalContent}>
-                        <Text style={styles.closureModalTitle}>
-                            {closureType === 'decide' ? '△ Decide'
-                                : closureType === 'defer' ? '⏸ Defer'
-                                    : closureType === 'next' ? '→ Next Action'
-                                        : '◯ Pause'}
-                        </Text>
-                        <Text style={styles.closureModalPrompt}>{getClosurePrompt()}</Text>
-                        <TextInput
-                            style={styles.closureModalInput}
-                            placeholder={closureType === 'pause' ? 'Optional note...' : 'Enter details...'}
-                            placeholderTextColor={colors.textMuted}
-                            value={closureInput}
-                            onChangeText={setClosureInput}
-                            multiline
-                            autoFocus
-                        />
-                        <View style={styles.closureModalButtons}>
-                            <TouchableOpacity style={styles.closureModalCancel} onPress={() => setShowClosureModal(false)}>
-                                <Text style={styles.closureModalCancelText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.closureModalConfirm} onPress={executeClosure}>
-                                <Text style={styles.closureModalConfirmText}>Save & Close</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
 
             {/* Model download modal */}
             <Modal visible={showModelModal} transparent animationType="slide" onRequestClose={() => setShowModelModal(false)}>
@@ -692,17 +625,6 @@ const MessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
     );
 };
 
-const ClosureButton: React.FC<{
-    label: string;
-    glyph?: string;
-    onPress: () => void;
-}> = ({ label, glyph, onPress }) => (
-    <TouchableOpacity style={styles.closureButton} onPress={onPress}>
-        {glyph && <Text style={styles.closureGlyph}>{glyph}</Text>}
-        <Text style={styles.closureButtonText}>{label}</Text>
-    </TouchableOpacity>
-);
-
 const getPlaceholder = (mode: AskMode): string => {
     switch (mode) {
         case 'MirrorMesh': return 'Ask MirrorMesh...';
@@ -713,6 +635,8 @@ const getPlaceholder = (mode: AskMode): string => {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
+    outerWrapper: { flex: 1 },
+    outerWrapperContent: { flex: 1 },
 
     // Online banner
     onlineBanner: { backgroundColor: colors.online, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, alignItems: 'center' },
@@ -754,12 +678,6 @@ const styles = StyleSheet.create({
     streamingIndicator: { flexDirection: 'row', alignItems: 'center', padding: spacing.sm, gap: spacing.sm },
     streamingText: { ...typography.labelSmall, color: colors.textMuted, fontStyle: 'italic' },
 
-    // Closure buttons
-    closureButtons: { flexDirection: 'row', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.sm, borderTopWidth: 1, borderTopColor: colors.surface },
-    closureButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.sm, borderRadius: 8, backgroundColor: colors.surface },
-    closureGlyph: { color: colors.glyphDecision, marginRight: spacing.xs },
-    closureButtonText: { ...typography.labelMedium, color: colors.textSecondary },
-
     // Input
     inputContainer: { flexDirection: 'row', padding: spacing.md, paddingBottom: Platform.OS === 'ios' ? spacing.lg : spacing.xl, alignItems: 'flex-end', borderTopWidth: 1, borderTopColor: colors.surface, backgroundColor: colors.background },
     input: { flex: 1, backgroundColor: colors.surface, borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, ...typography.bodyMedium, color: colors.textPrimary, maxHeight: 100 },
@@ -768,18 +686,6 @@ const styles = StyleSheet.create({
     sendButtonText: { fontSize: 24, color: colors.textPrimary, fontWeight: 'bold' },
     micButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },
     micButtonText: { fontSize: 20 },
-
-    // Closure Modal
-    closureModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: spacing.lg },
-    closureModalContent: { backgroundColor: colors.surface, borderRadius: 16, padding: spacing.lg, width: '100%', maxWidth: 400 },
-    closureModalTitle: { ...typography.headlineMedium, color: colors.textPrimary, marginBottom: spacing.sm },
-    closureModalPrompt: { ...typography.bodyMedium, color: colors.textSecondary, marginBottom: spacing.md },
-    closureModalInput: { backgroundColor: colors.background, borderRadius: 8, padding: spacing.md, ...typography.bodyMedium, color: colors.textPrimary, minHeight: 80, textAlignVertical: 'top' },
-    closureModalButtons: { flexDirection: 'row', marginTop: spacing.lg, gap: spacing.sm },
-    closureModalCancel: { flex: 1, paddingVertical: spacing.md, borderRadius: 8, backgroundColor: colors.background, alignItems: 'center' },
-    closureModalCancelText: { ...typography.labelMedium, color: colors.textSecondary },
-    closureModalConfirm: { flex: 1, paddingVertical: spacing.md, borderRadius: 8, backgroundColor: colors.accentPrimary, alignItems: 'center' },
-    closureModalConfirmText: { ...typography.labelMedium, color: colors.textPrimary },
 
     // Voice Overlay
     voiceOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
@@ -820,6 +726,17 @@ const styles = StyleSheet.create({
     sparkDate: { ...typography.labelSmall, color: colors.textMuted },
     sparkTitle: { ...typography.headlineSmall, color: colors.textPrimary, marginBottom: 4 },
     sparkPreview: { ...typography.bodySmall, color: colors.textSecondary },
+
+    // Session Restore
+    restoreCard: { padding: spacing.lg, backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.accentPrimary, maxWidth: '90%', alignItems: 'center' },
+    restoreTitle: { ...typography.headlineSmall, color: colors.textPrimary, marginBottom: spacing.xs },
+    restoreSubtitle: { ...typography.bodyMedium, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.xs },
+    restoreTime: { ...typography.labelSmall, color: colors.textMuted, marginBottom: spacing.md },
+    restoreButtons: { flexDirection: 'row', gap: spacing.sm },
+    restoreButton: { paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, backgroundColor: colors.accentPrimary, borderRadius: 8 },
+    restoreButtonText: { ...typography.labelMedium, color: colors.textPrimary },
+    restoreButtonSecondary: { paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, backgroundColor: colors.surface, borderRadius: 8, borderWidth: 1, borderColor: colors.textMuted },
+    restoreButtonSecondaryText: { ...typography.labelMedium, color: colors.textSecondary },
 });
 
 export default AskScreen;

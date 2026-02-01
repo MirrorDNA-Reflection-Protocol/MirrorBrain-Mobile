@@ -6,3 +6,6 @@ export { NowScreen } from './NowScreen';
 export { AskScreen } from './AskScreen';
 export { VaultScreen } from './VaultScreen';
 export { ActionsScreen } from './ActionsScreen';
+export { BriefingScreen } from './BriefingScreen';
+export { RelationshipsScreen } from './RelationshipsScreen';
+export { DigestScreen } from './DigestScreen';

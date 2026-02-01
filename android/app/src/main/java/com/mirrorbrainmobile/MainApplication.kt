@@ -7,6 +7,15 @@ import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.mirrorbrainmobile.passive.PassiveIntelligencePackage
+import com.mirrorbrainmobile.root.RootDaemonPackage
+import com.mirrorbrainmobile.root.RootShellManager
+import com.mirrorbrainmobile.gesture.GesturePackage
+import com.mirrorbrainmobile.overlay.OverlayPackage
+import com.mirrorbrainmobile.widget.WidgetPackage
+import com.mirrorbrainmobile.capture.CapturePackage
+import com.mirrorbrainmobile.automation.AutomationPackage
+import com.mirrorbrainmobile.location.LocationPackage
+import com.mirrorbrainmobile.focus.FocusPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -17,6 +26,22 @@ class MainApplication : Application(), ReactApplication {
         PackageList(this).packages.apply {
           // PassiveIntelligence: Clipboard watcher, notification interceptor, screen context
           add(PassiveIntelligencePackage())
+          // RootDaemon: Root shell access and background daemon
+          add(RootDaemonPackage())
+          // GestureDetector: Shake and gesture detection
+          add(GesturePackage())
+          // OverlayService: Floating bubble and panel
+          add(OverlayPackage())
+          // Widget: Home screen widget
+          add(WidgetPackage())
+          // Capture: OCR and screenshot observation
+          add(CapturePackage())
+          // Automation: Cross-app accessibility actions
+          add(AutomationPackage())
+          // Location: Geofencing and location triggers
+          add(LocationPackage())
+          // Focus: Focus mode and auto-responder
+          add(FocusPackage())
         },
     )
   }
@@ -24,7 +49,10 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     loadReactNative(this)
-    
+
+    // Initialize root shell manager early
+    RootShellManager.initialize()
+
     // DISABLED: AgentService auto-start removed.
     // The dataSync foreground service type crashes after ~6 hours on Android 15
     // (ForegroundServiceDidNotStartInTimeException). All agent orchestration now
