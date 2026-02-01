@@ -577,7 +577,7 @@ class OrchestratorServiceClass {
             }
 
             // No action or answer — clean up raw response for display
-            const cleanedAnswer = this.cleanResponse(result.text);
+            const cleanedAnswer = this.cleanResponse(responseText);
             this.history.push({
                 role: 'assistant',
                 content: cleanedAnswer,
