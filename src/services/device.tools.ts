@@ -135,6 +135,119 @@ export function registerDeviceTools(): void {
             requiresNetwork: false,
         },
 
+        // WiFi/Network info — local only
+        {
+            name: 'get_network',
+            description: 'Get current network/WiFi information (connected network, IP address)',
+            parameters: { type: 'object', properties: {} },
+            execute: async () => {
+                try {
+                    const NetInfo = require('@react-native-community/netinfo').default;
+                    const state = await NetInfo.fetch();
+                    const info = {
+                        type: state.type,
+                        isConnected: state.isConnected,
+                        isInternetReachable: state.isInternetReachable,
+                        ssid: state.details?.ssid || 'Unknown',
+                        ipAddress: state.details?.ipAddress || 'Unknown',
+                        strength: state.details?.strength,
+                    };
+                    const strengthText = info.strength ? ` (${info.strength}% signal)` : '';
+                    return {
+                        success: true,
+                        data: info,
+                        formatted: info.isConnected
+                            ? `Connected to ${info.ssid}${strengthText}. IP: ${info.ipAddress}`
+                            : 'Not connected to any network.',
+                    };
+                } catch {
+                    return { success: false, error: 'Could not get network info. NetInfo not available.' };
+                }
+            },
+            source: 'local',
+            requiresNetwork: false,
+        },
+
+        // Full device info — local only
+        {
+            name: 'get_device_info',
+            description: 'Get comprehensive device information (model, OS, memory, etc.)',
+            parameters: { type: 'object', properties: {} },
+            execute: async () => {
+                try {
+                    const DeviceInfo = require('react-native-device-info').default;
+                    const [brand, model, systemVersion, totalMemory, usedMemory] = await Promise.all([
+                        DeviceInfo.getBrand(),
+                        DeviceInfo.getModel(),
+                        DeviceInfo.getSystemVersion(),
+                        DeviceInfo.getTotalMemory(),
+                        DeviceInfo.getUsedMemory(),
+                    ]);
+                    const totalRam = Math.round(totalMemory / (1024 * 1024 * 1024) * 10) / 10;
+                    const usedRam = Math.round(usedMemory / (1024 * 1024 * 1024) * 10) / 10;
+                    return {
+                        success: true,
+                        data: { brand, model, systemVersion, totalRam, usedRam },
+                        formatted: `${brand} ${model}, Android ${systemVersion}. RAM: ${usedRam}GB used of ${totalRam}GB.`,
+                    };
+                } catch {
+                    return { success: false, error: 'Could not get device info' };
+                }
+            },
+            source: 'local',
+            requiresNetwork: false,
+        },
+
+        // Set clipboard — local only
+        {
+            name: 'set_clipboard',
+            description: 'Copy text to clipboard',
+            parameters: {
+                type: 'object',
+                properties: {
+                    text: { type: 'string', description: 'Text to copy to clipboard' },
+                },
+                required: ['text'],
+            },
+            execute: async (params) => {
+                try {
+                    const Clipboard = require('@react-native-clipboard/clipboard').default;
+                    Clipboard.setString(params.text as string);
+                    return {
+                        success: true,
+                        data: { copied: true },
+                        formatted: 'Text copied to clipboard.',
+                    };
+                } catch {
+                    return { success: false, error: 'Could not copy to clipboard' };
+                }
+            },
+            source: 'local',
+            requiresNetwork: false,
+        },
+
+        // Get current time — local only
+        {
+            name: 'get_time',
+            description: 'Get current date and time',
+            parameters: { type: 'object', properties: {} },
+            execute: async () => {
+                const now = new Date();
+                return {
+                    success: true,
+                    data: {
+                        time: now.toLocaleTimeString(),
+                        date: now.toLocaleDateString(),
+                        day: now.toLocaleDateString('en-US', { weekday: 'long' }),
+                        iso: now.toISOString(),
+                    },
+                    formatted: `It's ${now.toLocaleTimeString()} on ${now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}.`,
+                };
+            },
+            source: 'local',
+            requiresNetwork: false,
+        },
+
         // Vault capture — local only
         {
             name: 'save_note',
