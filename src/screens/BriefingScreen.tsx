@@ -376,13 +376,13 @@ const styles = StyleSheet.create({
         marginRight: spacing.xs,
     },
     priorityHigh: {
-        backgroundColor: colors.status.error,
+        backgroundColor: colors.error,
     },
     priorityMedium: {
-        backgroundColor: colors.status.warning,
+        backgroundColor: colors.warning,
     },
     priorityLow: {
-        backgroundColor: colors.status.success,
+        backgroundColor: colors.success,
     },
     itemText: {
         ...typography.bodyMedium,

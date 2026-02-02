@@ -15,6 +15,7 @@ import {
     TouchableOpacity,
     NativeSyntheticEvent,
     NativeScrollEvent,
+    Platform,
 } from 'react-native';
 import { NowScreen, AskScreen, VaultScreen, ActionsScreen } from './screens';
 import { IdentityImportModal } from './components';
@@ -171,10 +172,13 @@ export const App: React.FC = () => {
     );
 };
 
+const STATUSBAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 0;
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#000000',
+        paddingTop: STATUSBAR_HEIGHT,
     },
     contentContainer: {
         flex: 1,

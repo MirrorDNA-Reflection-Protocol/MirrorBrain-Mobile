@@ -237,8 +237,8 @@ const DigestSectionCard: React.FC<{ section: DigestSection }> = ({ section }) =>
 
 const MetricBadge: React.FC<{ metric: DigestMetric }> = ({ metric }) => {
     const trendIcon = metric.trend === 'up' ? '↑' : metric.trend === 'down' ? '↓' : '';
-    const trendColor = metric.trend === 'up' ? colors.status.success :
-                       metric.trend === 'down' ? colors.status.error : colors.textSecondary;
+    const trendColor = metric.trend === 'up' ? colors.success :
+                       metric.trend === 'down' ? colors.error : colors.textSecondary;
 
     return (
         <View style={styles.metricBadge}>

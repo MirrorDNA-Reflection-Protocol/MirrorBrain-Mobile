@@ -284,9 +284,9 @@ const RelationshipCard: React.FC<{
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getHealthColor(score: number): string {
-    if (score >= 70) return colors.status.success;
-    if (score >= 40) return colors.status.warning;
-    return colors.status.error;
+    if (score >= 70) return colors.success;
+    if (score >= 40) return colors.warning;
+    return colors.error;
 }
 
 function formatRelativeTime(date: Date): string {

@@ -20,7 +20,10 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
-import { VaultService, CalendarService, VoiceService, type CalendarEvent } from '../services';
+import { VaultService, CalendarService, VoiceService, FocusService, type CalendarEvent } from '../services';
+import { BriefingScreen } from './BriefingScreen';
+import { RelationshipsScreen } from './RelationshipsScreen';
+import { DigestScreen } from './DigestScreen';
 
 interface Action {
     id: string;
@@ -31,6 +34,34 @@ interface Action {
 }
 
 const actions: Action[] = [
+    {
+        id: 'briefing',
+        icon: '🌅',
+        label: 'Briefing',
+        description: 'Morning/evening summary',
+        available: true,
+    },
+    {
+        id: 'focus-mode',
+        icon: '🎯',
+        label: 'Focus Mode',
+        description: 'Deep work with auto-reply',
+        available: true,
+    },
+    {
+        id: 'relationships',
+        icon: '👥',
+        label: 'Relationships',
+        description: 'Communication tracking',
+        available: true,
+    },
+    {
+        id: 'digest',
+        icon: '📊',
+        label: 'Weekly Digest',
+        description: 'AI-generated summary',
+        available: true,
+    },
     {
         id: 'capture-note',
         icon: '📝',
@@ -46,13 +77,6 @@ const actions: Action[] = [
         available: true,
     },
     {
-        id: 'screenshot-summarize',
-        icon: '📸',
-        label: 'Screenshot → Vault',
-        description: 'Save screenshot (no summary yet)',
-        available: false, // Needs vision model
-    },
-    {
         id: 'calendar-glance',
         icon: '📅',
         label: 'Calendar glance',
@@ -65,13 +89,6 @@ const actions: Action[] = [
         label: 'Navigation handoff',
         description: 'Open maps with context',
         available: true,
-    },
-    {
-        id: 'share-inbox',
-        icon: '📥',
-        label: 'Share inbox',
-        description: 'Receive shares from other apps',
-        available: false, // Phase 4
     },
 ];
 
@@ -95,6 +112,14 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
     const [isRecording, setIsRecording] = useState(false);
     const [recordingText, setRecordingText] = useState('');
 
+    // New screen modals
+    const [briefingVisible, setBriefingVisible] = useState(false);
+    const [relationshipsVisible, setRelationshipsVisible] = useState(false);
+    const [digestVisible, setDigestVisible] = useState(false);
+    const [focusModalVisible, setFocusModalVisible] = useState(false);
+    const [focusActive, setFocusActive] = useState(false);
+    const [focusLoading, setFocusLoading] = useState(false);
+
 
 
     const handleAction = (action: Action) => {
@@ -104,6 +129,18 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
         }
 
         switch (action.id) {
+            case 'briefing':
+                setBriefingVisible(true);
+                break;
+            case 'focus-mode':
+                handleFocusMode();
+                break;
+            case 'relationships':
+                setRelationshipsVisible(true);
+                break;
+            case 'digest':
+                setDigestVisible(true);
+                break;
             case 'capture-note':
                 setCaptureModalVisible(true);
                 break;
@@ -116,6 +153,38 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
             case 'navigation':
                 handleNavigation();
                 break;
+        }
+    };
+
+    const handleFocusMode = async () => {
+        setFocusModalVisible(true);
+        setFocusLoading(true);
+        try {
+            const status = await FocusService.getStatus();
+            setFocusActive(status.active);
+        } catch (error) {
+            console.error('Failed to get focus status:', error);
+        } finally {
+            setFocusLoading(false);
+        }
+    };
+
+    const toggleFocus = async () => {
+        setFocusLoading(true);
+        try {
+            if (focusActive) {
+                await FocusService.end();
+                setFocusActive(false);
+                Alert.alert('Focus Ended', 'Auto-responder disabled');
+            } else {
+                await FocusService.start({ duration: 25, reason: 'Deep Work', preset: 'deep_work' });
+                setFocusActive(true);
+                Alert.alert('Focus Started', '25 minutes of deep work. Auto-responder enabled.');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to toggle focus mode');
+        } finally {
+            setFocusLoading(false);
         }
     };
 
@@ -378,6 +447,102 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
                     </View>
                 </View>
             </Modal>
+
+            {/* Focus Mode modal */}
+            <Modal
+                visible={focusModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setFocusModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>🎯 Focus Mode</Text>
+                            <TouchableOpacity
+                                onPress={() => setFocusModalVisible(false)}
+                                style={styles.closeButton}
+                            >
+                                <Text style={styles.closeButtonText}>✕</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {focusLoading ? (
+                            <ActivityIndicator size="large" color={colors.accentPrimary} />
+                        ) : (
+                            <View style={styles.focusContent}>
+                                <Text style={styles.focusStatus}>
+                                    {focusActive ? 'Focus mode is ON' : 'Focus mode is OFF'}
+                                </Text>
+                                <Text style={styles.focusHint}>
+                                    {focusActive
+                                        ? 'Auto-responder will reply to messages for you'
+                                        : 'Start a 25-minute deep work session'}
+                                </Text>
+                                <TouchableOpacity
+                                    style={[styles.focusButton, focusActive && styles.focusButtonActive]}
+                                    onPress={toggleFocus}
+                                >
+                                    <Text style={styles.focusButtonText}>
+                                        {focusActive ? 'End Focus' : 'Start Focus'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Briefing Screen modal */}
+            <Modal
+                visible={briefingVisible}
+                animationType="slide"
+                onRequestClose={() => setBriefingVisible(false)}
+            >
+                <View style={styles.fullScreenModal}>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => setBriefingVisible(false)}
+                    >
+                        <Text style={styles.backButtonText}>← Back</Text>
+                    </TouchableOpacity>
+                    <BriefingScreen />
+                </View>
+            </Modal>
+
+            {/* Relationships Screen modal */}
+            <Modal
+                visible={relationshipsVisible}
+                animationType="slide"
+                onRequestClose={() => setRelationshipsVisible(false)}
+            >
+                <View style={styles.fullScreenModal}>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => setRelationshipsVisible(false)}
+                    >
+                        <Text style={styles.backButtonText}>← Back</Text>
+                    </TouchableOpacity>
+                    <RelationshipsScreen />
+                </View>
+            </Modal>
+
+            {/* Digest Screen modal */}
+            <Modal
+                visible={digestVisible}
+                animationType="slide"
+                onRequestClose={() => setDigestVisible(false)}
+            >
+                <View style={styles.fullScreenModal}>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => setDigestVisible(false)}
+                    >
+                        <Text style={styles.backButtonText}>← Back</Text>
+                    </TouchableOpacity>
+                    <DigestScreen />
+                </View>
+            </Modal>
         </View>
     );
 };
@@ -604,6 +769,51 @@ const styles = StyleSheet.create({
         ...typography.bodySmall,
         color: colors.textMuted,
         marginTop: spacing.xs,
+    },
+
+    // Focus mode
+    focusContent: {
+        alignItems: 'center',
+        paddingVertical: spacing.lg,
+    },
+    focusStatus: {
+        ...typography.headlineMedium,
+        color: colors.textPrimary,
+        marginBottom: spacing.sm,
+    },
+    focusHint: {
+        ...typography.bodyMedium,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        marginBottom: spacing.lg,
+    },
+    focusButton: {
+        backgroundColor: colors.accentPrimary,
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.xl,
+        borderRadius: 12,
+    },
+    focusButtonActive: {
+        backgroundColor: colors.error,
+    },
+    focusButtonText: {
+        ...typography.labelLarge,
+        color: colors.textPrimary,
+    },
+
+    // Full screen modals
+    fullScreenModal: {
+        flex: 1,
+        backgroundColor: colors.background,
+    },
+    backButton: {
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.xl,
+        paddingBottom: spacing.sm,
+    },
+    backButtonText: {
+        ...typography.labelLarge,
+        color: colors.accentPrimary,
     },
 });
 
