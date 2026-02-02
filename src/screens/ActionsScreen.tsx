@@ -24,6 +24,7 @@ import { VaultService, CalendarService, VoiceService, FocusService, type Calenda
 import { BriefingScreen } from './BriefingScreen';
 import { RelationshipsScreen } from './RelationshipsScreen';
 import { DigestScreen } from './DigestScreen';
+import { MeshChatScreen } from './MeshChatScreen';
 
 interface Action {
     id: string;
@@ -60,6 +61,13 @@ const actions: Action[] = [
         icon: '📊',
         label: 'Weekly Digest',
         description: 'AI-generated summary',
+        available: true,
+    },
+    {
+        id: 'mesh-chat',
+        icon: '🌐',
+        label: 'Mesh Chat',
+        description: 'Talk to other agents',
         available: true,
     },
     {
@@ -116,6 +124,7 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
     const [briefingVisible, setBriefingVisible] = useState(false);
     const [relationshipsVisible, setRelationshipsVisible] = useState(false);
     const [digestVisible, setDigestVisible] = useState(false);
+    const [meshChatVisible, setMeshChatVisible] = useState(false);
     const [focusModalVisible, setFocusModalVisible] = useState(false);
     const [focusActive, setFocusActive] = useState(false);
     const [focusLoading, setFocusLoading] = useState(false);
@@ -140,6 +149,9 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
                 break;
             case 'digest':
                 setDigestVisible(true);
+                break;
+            case 'mesh-chat':
+                setMeshChatVisible(true);
                 break;
             case 'capture-note':
                 setCaptureModalVisible(true);
@@ -541,6 +553,23 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
                         <Text style={styles.backButtonText}>← Back</Text>
                     </TouchableOpacity>
                     <DigestScreen />
+                </View>
+            </Modal>
+
+            {/* Mesh Chat Screen modal */}
+            <Modal
+                visible={meshChatVisible}
+                animationType="slide"
+                onRequestClose={() => setMeshChatVisible(false)}
+            >
+                <View style={styles.fullScreenModal}>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => setMeshChatVisible(false)}
+                    >
+                        <Text style={styles.backButtonText}>← Back</Text>
+                    </TouchableOpacity>
+                    <MeshChatScreen />
                 </View>
             </Modal>
         </View>

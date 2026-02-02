@@ -9,3 +9,4 @@ export { ActionsScreen } from './ActionsScreen';
 export { BriefingScreen } from './BriefingScreen';
 export { RelationshipsScreen } from './RelationshipsScreen';
 export { DigestScreen } from './DigestScreen';
+export { MeshChatScreen } from './MeshChatScreen';

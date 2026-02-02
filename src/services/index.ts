@@ -187,3 +187,14 @@ export {
     type DigestItem,
     type WeeklyStats,
 } from './digest.service';
+
+// Mesh Service — Agent Communication Network
+export {
+    MeshService,
+    type MeshAgent,
+    type ChatMessage,
+    type TaskMessage,
+    type TaskResultMessage,
+    type PresenceMessage,
+    type MeshMessage,
+} from './mesh.service';
