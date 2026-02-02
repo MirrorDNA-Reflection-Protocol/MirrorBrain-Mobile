@@ -68,8 +68,8 @@ type MessageCallback = (message: MeshMessage) => void;
 type ConnectionCallback = (connected: boolean) => void;
 
 // Default relay address (Tailscale IP of Mac)
-const DEFAULT_RELAY_HOST = '100.64.0.1'; // Update with your Mac's Tailscale IP
-const DEFAULT_RELAY_PORT = 8765;
+const DEFAULT_RELAY_HOST = '100.114.247.53'; // active-mirror-hub Tailscale IP
+const DEFAULT_RELAY_PORT = 8766;
 
 class MeshServiceClass {
     private ws: WebSocket | null = null;
