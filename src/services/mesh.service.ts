@@ -6,7 +6,7 @@
  */
 
 import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
-import { DeviceService } from './device.service';
+import DeviceInfo from 'react-native-device-info';
 import { OrchestratorService } from './orchestrator.service';
 
 // Message types
@@ -67,8 +67,8 @@ export type MeshMessage = ChatMessage | TaskMessage | TaskResultMessage | Presen
 type MessageCallback = (message: MeshMessage) => void;
 type ConnectionCallback = (connected: boolean) => void;
 
-// Default relay address (Tailscale IP of Mac)
-const DEFAULT_RELAY_HOST = '100.114.247.53'; // active-mirror-hub Tailscale IP
+// Default relay address (localhost via adb reverse, or Tailscale IP)
+const DEFAULT_RELAY_HOST = 'localhost'; // Works via adb reverse tcp:8766 tcp:8766
 const DEFAULT_RELAY_PORT = 8766;
 
 class MeshServiceClass {
@@ -96,11 +96,19 @@ class MeshServiceClass {
         if (relayPort) this.relayPort = relayPort;
 
         // Get device info for agent identity
-        const deviceInfo = await DeviceService.getDeviceInfo();
-        this.agentId = `phone-${deviceInfo.deviceId.substring(0, 8)}`;
-        this.agentName = deviceInfo.deviceName || 'MirrorBrain Phone';
+        try {
+            const deviceId = await DeviceInfo.getUniqueId();
+            const deviceName = await DeviceInfo.getDeviceName();
+            this.agentId = `phone-${deviceId.substring(0, 8)}`;
+            this.agentName = deviceName || 'MirrorBrain Phone';
+        } catch (error) {
+            // Fallback if device info fails
+            this.agentId = `phone-${Date.now().toString(36)}`;
+            this.agentName = 'MirrorBrain Phone';
+            console.warn('[MeshService] Device info failed, using fallback:', error);
+        }
 
-        console.log(`[MeshService] Initialized as ${this.agentId}`);
+        console.log(`[MeshService] Initialized as ${this.agentId} (${this.agentName})`);
     }
 
     /**

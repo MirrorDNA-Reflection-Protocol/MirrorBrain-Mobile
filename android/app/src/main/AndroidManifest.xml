@@ -72,7 +72,8 @@
       android:allowBackup="false"
       android:theme="@style/AppTheme"
       android:requestLegacyExternalStorage="true"
-      android:usesCleartextTraffic="${usesCleartextTraffic}"
+      android:usesCleartextTraffic="true"
+      android:networkSecurityConfig="@xml/network_security_config"
       android:supportsRtl="true">
 
       <!-- OpenCL for GPU acceleration (Pixel 9 Pro XL) -->
