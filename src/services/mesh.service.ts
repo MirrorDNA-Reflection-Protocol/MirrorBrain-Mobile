@@ -67,8 +67,9 @@ export type MeshMessage = ChatMessage | TaskMessage | TaskResultMessage | Presen
 type MessageCallback = (message: MeshMessage) => void;
 type ConnectionCallback = (connected: boolean) => void;
 
-// Default relay address (localhost via adb reverse, or Tailscale IP)
-const DEFAULT_RELAY_HOST = 'localhost'; // Works via adb reverse tcp:8766 tcp:8766
+// Relay addresses — try Tailscale first, fallback to localhost (adb reverse)
+const TAILSCALE_RELAY_HOST = '100.114.247.53'; // active-mirror-hub Tailscale IP
+const LOCALHOST_RELAY_HOST = 'localhost'; // Works via adb reverse
 const DEFAULT_RELAY_PORT = 8766;
 
 class MeshServiceClass {
@@ -85,8 +86,9 @@ class MeshServiceClass {
     private connectionCallbacks: Set<ConnectionCallback> = new Set();
     private pendingTasks: Map<string, (result: TaskResultMessage) => void> = new Map();
 
-    private relayHost: string = DEFAULT_RELAY_HOST;
+    private relayHost: string = TAILSCALE_RELAY_HOST;
     private relayPort: number = DEFAULT_RELAY_PORT;
+    private useTailscale: boolean = true;
 
     /**
      * Initialize the mesh service
@@ -112,53 +114,99 @@ class MeshServiceClass {
     }
 
     /**
-     * Connect to the mesh relay
+     * Connect to the mesh relay (tries Tailscale first, then localhost)
      */
     async connect(): Promise<boolean> {
         if (this.connected || this.reconnecting) {
             return this.connected;
         }
 
+        // Try Tailscale first, then localhost
+        const hosts = [TAILSCALE_RELAY_HOST, LOCALHOST_RELAY_HOST];
+
+        for (const host of hosts) {
+            const success = await this.tryConnect(host);
+            if (success) {
+                this.relayHost = host;
+                console.log(`[MeshService] Connected via ${host === TAILSCALE_RELAY_HOST ? 'Tailscale' : 'localhost'}`);
+                return true;
+            }
+        }
+
+        this.scheduleReconnect();
+        return false;
+    }
+
+    /**
+     * Try connecting to a specific host
+     */
+    private tryConnect(host: string): Promise<boolean> {
         return new Promise((resolve) => {
             try {
-                const url = `ws://${this.relayHost}:${this.relayPort}`;
-                console.log(`[MeshService] Connecting to ${url}...`);
+                const url = `ws://${host}:${this.relayPort}`;
+                console.log(`[MeshService] Trying ${url}...`);
 
-                this.ws = new WebSocket(url);
+                const ws = new WebSocket(url);
+                const timeout = setTimeout(() => {
+                    console.log(`[MeshService] Timeout connecting to ${host}`);
+                    ws.close();
+                    resolve(false);
+                }, 3000); // 3 second timeout
 
-                this.ws.onopen = () => {
-                    console.log('[MeshService] Connected to relay');
+                ws.onopen = () => {
+                    clearTimeout(timeout);
+                    console.log(`[MeshService] Connected to ${host}`);
+                    this.ws = ws;
                     this.connected = true;
                     this.reconnecting = false;
+                    this.setupWebSocketHandlers();
                     this.register();
                     this.startHeartbeat();
                     this.notifyConnectionCallbacks(true);
                     resolve(true);
                 };
 
-                this.ws.onmessage = (event) => {
-                    this.handleMessage(event.data);
-                };
-
-                this.ws.onerror = (error) => {
-                    console.error('[MeshService] WebSocket error:', error);
-                };
-
-                this.ws.onclose = () => {
-                    console.log('[MeshService] Disconnected from relay');
-                    this.connected = false;
-                    this.stopHeartbeat();
-                    this.notifyConnectionCallbacks(false);
-                    this.scheduleReconnect();
+                ws.onerror = () => {
+                    clearTimeout(timeout);
+                    console.log(`[MeshService] Failed to connect to ${host}`);
                     resolve(false);
                 };
 
+                ws.onclose = () => {
+                    clearTimeout(timeout);
+                    if (!this.connected) {
+                        resolve(false);
+                    }
+                };
+
             } catch (error) {
-                console.error('[MeshService] Connection error:', error);
-                this.scheduleReconnect();
+                console.error(`[MeshService] Error connecting to ${host}:`, error);
                 resolve(false);
             }
         });
+    }
+
+    /**
+     * Set up WebSocket event handlers
+     */
+    private setupWebSocketHandlers(): void {
+        if (!this.ws) return;
+
+        this.ws.onmessage = (event) => {
+            this.handleMessage(event.data);
+        };
+
+        this.ws.onerror = (error) => {
+            console.error('[MeshService] WebSocket error:', error);
+        };
+
+        this.ws.onclose = () => {
+            console.log('[MeshService] Disconnected from relay');
+            this.connected = false;
+            this.stopHeartbeat();
+            this.notifyConnectionCallbacks(false);
+            this.scheduleReconnect();
+        };
     }
 
     /**
