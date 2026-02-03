@@ -31,6 +31,11 @@
 
     <!-- Android 11+ package visibility for launching other apps -->
     <queries>
+        <!-- Speech recognition -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <package android:name="com.google.android.googlequicksearchbox" />
         <package android:name="md.obsidian" />
         <!-- Sprint 3: Messaging apps for automation -->
         <package android:name="com.whatsapp" />

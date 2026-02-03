@@ -16,6 +16,7 @@ import com.mirrorbrainmobile.capture.CapturePackage
 import com.mirrorbrainmobile.automation.AutomationPackage
 import com.mirrorbrainmobile.location.LocationPackage
 import com.mirrorbrainmobile.focus.FocusPackage
+import com.mirrorbrainmobile.speech.SpeechPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -42,6 +43,8 @@ class MainApplication : Application(), ReactApplication {
           add(LocationPackage())
           // Focus: Focus mode and auto-responder
           add(FocusPackage())
+          // Speech: Native speech recognition
+          add(SpeechPackage())
         },
     )
   }

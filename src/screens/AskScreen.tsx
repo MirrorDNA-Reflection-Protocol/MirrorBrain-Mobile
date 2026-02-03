@@ -18,10 +18,11 @@ import {
     Platform,
     Modal,
     ActivityIndicator,
+    Alert,
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
 import { useLLM, useSessionRestore } from '../hooks';
-import { VaultService, IdentityService, HapticSymphony, VoiceService, SearchService, OrchestratorService } from '../services';
+import { VaultService, IdentityService, HapticSymphony, VoiceService, SearchService, OrchestratorService, TTSService } from '../services';
 import type { SearchResult, MemorySpark } from '../services';
 import { BrowserPane, SearchResultCard, Logo } from '../components';
 import { RefineButton } from '../components/RefineButton';
@@ -88,11 +89,28 @@ export const AskScreen: React.FC<AskScreenProps> = ({
         setInput('');
         setIsListening(true);
 
-        const started = await VoiceService.startListening((text, _isFinal) => {
-            setInput(text);
-        });
+        try {
+            const isAvailable = VoiceService.isVoiceAvailable();
+            if (!isAvailable) {
+                Alert.alert('Voice Not Available', 'Speech recognition is not available on this device.');
+                setIsListening(false);
+                return;
+            }
 
-        if (!started) {
+            const started = await VoiceService.startListening((text, _isFinal) => {
+                setInput(text);
+            });
+
+            if (!started) {
+                const error = VoiceService.getLastError();
+                Alert.alert(
+                    'Voice Failed',
+                    `Could not start voice recognition.\n\nError: ${error || 'Unknown'}\n\nMake sure:\n• Microphone permission is granted\n• Google app is installed\n• Speech recognition is enabled`
+                );
+                setIsListening(false);
+            }
+        } catch (error) {
+            Alert.alert('Voice Error', String(error));
             setIsListening(false);
         }
     };
@@ -272,6 +290,10 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                     timestamp: new Date(),
                 };
                 setMessages([...newMessages, assistantMessage]);
+                // Speak the response
+                if (result.finalAnswer) {
+                    TTSService.speak(result.finalAnswer);
+                }
             } catch (error) {
                 const errorMessage: ChatMessage = {
                     role: 'assistant',

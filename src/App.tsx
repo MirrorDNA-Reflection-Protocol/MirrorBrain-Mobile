@@ -25,6 +25,7 @@ import {
     registerDeviceTools,
     PassiveIntelligenceService,
     MobileBusService,
+    MeshService,
 } from './services';
 import { colors, spacing } from './theme';
 import type { PanelName } from './types';
@@ -59,6 +60,15 @@ export const App: React.FC = () => {
 
             // Initialize Mobile Bus for hub communication
             await MobileBusService.initialize();
+
+            // Initialize Mesh Service with auto-connect for agent communication
+            try {
+                await MeshService.initialize();
+                await MeshService.connect();
+                console.log('[App] Mesh service connected');
+            } catch (meshError) {
+                console.warn('[App] Mesh service failed to connect:', meshError);
+            }
 
             if (!hasIdentity) {
                 setTimeout(() => setShowIdentityModal(true), 1000);

@@ -449,7 +449,7 @@ export const VaultScreen: React.FC<VaultScreenProps> = ({ onLockSwipe }) => {
                                     try { await Linking.openURL(url); } catch { }
                                 }}
                             />
-                            {/* Floating exit button for graph mode */}
+                            {/* Floating exit button for graph mode - prominent at top */}
                             <TouchableOpacity
                                 style={styles.exitGraphButton}
                                 onPress={() => {
@@ -458,8 +458,12 @@ export const VaultScreen: React.FC<VaultScreenProps> = ({ onLockSwipe }) => {
                                     onLockSwipe?.(false);
                                 }}
                             >
-                                <Text style={styles.exitGraphText}>← Exit Graph</Text>
+                                <Text style={styles.exitGraphText}>✕ CLOSE GRAPH</Text>
                             </TouchableOpacity>
+                            {/* Instructions at bottom */}
+                            <View style={styles.graphInstructions}>
+                                <Text style={styles.graphInstructionsText}>Pinch to zoom • Drag to pan • Tap node to open</Text>
+                            </View>
                         </Animated.View>
                     )}
                     {/* Sync buttons */}
@@ -672,19 +676,36 @@ const styles = StyleSheet.create({
     },
     exitGraphButton: {
         position: 'absolute',
-        bottom: spacing.lg,
-        left: spacing.lg,
-        backgroundColor: colors.accentDark,
-        paddingVertical: spacing.sm,
-        paddingHorizontal: spacing.md,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: colors.accentLight,
+        top: 20,
+        left: 20,
+        right: 20,
+        backgroundColor: 'rgba(255, 100, 100, 0.9)',
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+        borderRadius: 12,
+        alignItems: 'center',
+        zIndex: 1000,
     },
     exitGraphText: {
-        ...typography.labelMedium,
-        color: colors.textPrimary,
-        fontWeight: '600',
+        fontSize: 18,
+        color: '#ffffff',
+        fontWeight: 'bold',
+        letterSpacing: 1,
+    },
+    graphInstructions: {
+        position: 'absolute',
+        bottom: 30,
+        left: 20,
+        right: 20,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    graphInstructionsText: {
+        fontSize: 12,
+        color: 'rgba(255, 255, 255, 0.7)',
     },
 
     // Search
