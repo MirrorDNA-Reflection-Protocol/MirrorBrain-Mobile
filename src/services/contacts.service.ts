@@ -11,6 +11,7 @@ export interface PriorityContact {
     id: string;
     name: string;
     phone?: string;
+    phoneNumber?: string; // alias for phone
     email?: string;
     emoji?: string;
 }
@@ -160,6 +161,28 @@ class ContactsServiceClass {
         } catch (error) {
             console.error('Failed to save contacts:', error);
         }
+    }
+
+    /**
+     * Search contacts by name
+     * Used by ActionExecutor for message and call intents
+     */
+    async search(query: string): Promise<PriorityContact[]> {
+        await this.initialize();
+        if (!query || query.trim().length === 0) return [];
+
+        const lowerQuery = query.toLowerCase();
+        return this.contacts.filter(c =>
+            c.name.toLowerCase().includes(lowerQuery)
+        );
+    }
+
+    /**
+     * Get priority contacts (alias for getContacts)
+     * Used by BriefingService and NotificationFilter
+     */
+    async getPriorityContacts(): Promise<PriorityContact[]> {
+        return this.getContacts();
     }
 }
 

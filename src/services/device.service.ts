@@ -91,6 +91,32 @@ class DeviceServiceClass {
         const hoursRemaining = Math.round((batteryLevel / 100) * 10);
         return `~${hoursRemaining}h`;
     }
+
+    /**
+     * Get unique device ID
+     * Used by LocalAgentService and MeshService
+     */
+    async getDeviceId(): Promise<string> {
+        try {
+            return await DeviceInfo.getUniqueId();
+        } catch (error) {
+            console.warn('[DeviceService] Failed to get device ID:', error);
+            return `device-${Date.now()}`;
+        }
+    }
+
+    /**
+     * Check if device is charging
+     * Used by NudgeService for battery-aware nudges
+     */
+    async isCharging(): Promise<boolean> {
+        try {
+            return await DeviceInfo.isBatteryCharging();
+        } catch (error) {
+            console.warn('[DeviceService] Failed to check charging status:', error);
+            return false;
+        }
+    }
 }
 
 // Singleton export

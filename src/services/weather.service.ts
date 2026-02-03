@@ -10,6 +10,8 @@ export interface WeatherData {
     temperature: number;
     condition: 'sunny' | 'cloudy' | 'partly_cloudy' | 'rainy' | 'stormy' | 'snowy' | 'foggy';
     humidity?: number;
+    feelsLike?: number;
+    alerts?: string[];
     location?: string;
     updatedAt: Date;
 }
@@ -180,6 +182,14 @@ class WeatherServiceClass {
         if (code <= 86) return 'snowy';
         if (code >= 95) return 'stormy';
         return 'cloudy';
+    }
+
+    /**
+     * Get current weather (alias for getWeather)
+     * Used by BriefingService
+     */
+    async getCurrentWeather(): Promise<WeatherData> {
+        return this.getWeather();
     }
 }
 

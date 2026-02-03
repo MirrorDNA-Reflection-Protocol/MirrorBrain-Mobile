@@ -175,8 +175,9 @@ class NudgeServiceClass {
         this.lastBatteryCheck = now;
 
         try {
-            const battery = await DeviceService.getBatteryLevel();
-            const isCharging = await DeviceService.isCharging();
+            const batteryInfo = await DeviceService.getBatteryLevel();
+            const battery = batteryInfo.level;
+            const isCharging = batteryInfo.charging;
 
             if (!isCharging && battery <= this.config.batteryThreshold) {
                 const nudgeId = 'battery_low';
@@ -255,7 +256,7 @@ class NudgeServiceClass {
             const reminders = await VaultService.search('tag:reminder tag:pending');
 
             for (const reminder of reminders.slice(0, 3)) {
-                const nudgeId = `reminder_${reminder.path}`;
+                const nudgeId = `reminder_${reminder.id}`;
 
                 // Check if already active
                 if (this.activeNudges.has(nudgeId)) continue;
@@ -269,7 +270,7 @@ class NudgeServiceClass {
                     action: {
                         label: 'View',
                         type: 'navigate',
-                        payload: { screen: 'vault', path: reminder.path },
+                        payload: { screen: 'vault', path: reminder.id },
                     },
                 });
             }

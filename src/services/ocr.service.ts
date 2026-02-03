@@ -248,9 +248,8 @@ class OCRServiceClass {
             }
 
             await VaultService.createSpark(
-                `Screenshot: ${preview}...`,
-                content,
-                ['screenshot', 'ocr', 'auto-captured']
+                `Screenshot: ${preview}...\n\n${content}`,
+                'screenshot'
             );
 
             console.log('[OCRService] Saved to vault');

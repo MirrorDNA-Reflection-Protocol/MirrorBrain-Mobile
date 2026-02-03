@@ -15,7 +15,9 @@ import {
     ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
+    Animated,
 } from 'react-native';
+import Voice, { SpeechResultsEvent, SpeechErrorEvent } from '@react-native-voice/voice';
 
 import { colors, typography, spacing, borderRadius } from '../theme';
 import { GlassView } from '../components';
@@ -44,6 +46,9 @@ export const MeshChatScreen: React.FC = () => {
     const [agents, setAgents] = useState<MeshAgent[]>([]);
     const [inputText, setInputText] = useState('');
     const [selectedAgent, setSelectedAgent] = useState<string>('*'); // '*' for broadcast
+    const [isRecording, setIsRecording] = useState(false);
+    const [voiceSupported, setVoiceSupported] = useState(false);
+    const pulseAnim = useRef(new Animated.Value(1)).current;
 
     const flatListRef = useRef<FlatList>(null);
     const myAgentId = MeshService.getAgentId();
@@ -80,9 +85,34 @@ export const MeshChatScreen: React.FC = () => {
             handleIncomingMessage(msg);
         });
 
+        // Initialize voice
+        Voice.isAvailable().then(available => {
+            setVoiceSupported(!!available);
+        });
+
+        Voice.onSpeechResults = (e: SpeechResultsEvent) => {
+            if (e.value && e.value[0]) {
+                setInputText(prev => prev + (prev ? ' ' : '') + e.value![0]);
+            }
+            setIsRecording(false);
+            stopPulseAnimation();
+        };
+
+        Voice.onSpeechError = (e: SpeechErrorEvent) => {
+            console.error('[Voice] Error:', e.error);
+            setIsRecording(false);
+            stopPulseAnimation();
+        };
+
+        Voice.onSpeechEnd = () => {
+            setIsRecording(false);
+            stopPulseAnimation();
+        };
+
         return () => {
             unsubConnection();
             unsubMessages();
+            Voice.destroy().then(Voice.removeAllListeners);
         };
     }, []);
 
@@ -118,7 +148,7 @@ export const MeshChatScreen: React.FC = () => {
             scrollToBottom();
 
         } else if (msg.type === 'agents') {
-            setAgents((msg as { agents: MeshAgent[] }).agents);
+            setAgents((msg as unknown as { agents: MeshAgent[] }).agents);
 
         } else if (msg.type === 'presence') {
             setAgents(MeshService.getAgents());
@@ -182,6 +212,54 @@ export const MeshChatScreen: React.FC = () => {
         setConnecting(false);
     };
 
+    const startPulseAnimation = () => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulseAnim, {
+                    toValue: 1.2,
+                    duration: 500,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(pulseAnim, {
+                    toValue: 1,
+                    duration: 500,
+                    useNativeDriver: true,
+                }),
+            ])
+        ).start();
+    };
+
+    const stopPulseAnimation = () => {
+        pulseAnim.stopAnimation();
+        pulseAnim.setValue(1);
+    };
+
+    const handleVoiceRecord = async () => {
+        if (!voiceSupported) return;
+
+        HapticService.tap();
+
+        if (isRecording) {
+            try {
+                await Voice.stop();
+                setIsRecording(false);
+                stopPulseAnimation();
+            } catch (e) {
+                console.error('[Voice] Stop error:', e);
+            }
+        } else {
+            try {
+                setIsRecording(true);
+                startPulseAnimation();
+                await Voice.start('en-US');
+            } catch (e) {
+                console.error('[Voice] Start error:', e);
+                setIsRecording(false);
+                stopPulseAnimation();
+            }
+        }
+    };
+
     const renderMessage = ({ item }: { item: Message }) => {
         if (item.type === 'system') {
             return (
@@ -215,7 +293,7 @@ export const MeshChatScreen: React.FC = () => {
     const renderAgent = (agent: MeshAgent) => {
         const isSelected = selectedAgent === agent.id;
         const statusColor = agent.status === 'online' ? colors.success :
-                           agent.status === 'busy' ? colors.warning : colors.textMuted;
+            agent.status === 'busy' ? colors.warning : colors.textMuted;
 
         return (
             <TouchableOpacity
@@ -311,6 +389,17 @@ export const MeshChatScreen: React.FC = () => {
                     multiline
                     maxLength={1000}
                 />
+                {voiceSupported && (
+                    <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                        <TouchableOpacity
+                            style={[styles.micButton, isRecording && styles.micButtonActive]}
+                            onPress={handleVoiceRecord}
+                            disabled={!connected}
+                        >
+                            <Text style={styles.micButtonText}>{isRecording ? '...' : 'Mic'}</Text>
+                        </TouchableOpacity>
+                    </Animated.View>
+                )}
                 <TouchableOpacity
                     style={[styles.sendButton, (!connected || !inputText.trim()) && styles.sendButtonDisabled]}
                     onPress={handleSend}
@@ -522,6 +611,22 @@ const styles = StyleSheet.create({
         backgroundColor: colors.textMuted,
     },
     sendButtonText: {
+        ...typography.labelMedium,
+        color: colors.textPrimary,
+    },
+    micButton: {
+        backgroundColor: colors.surface,
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.sm,
+        borderRadius: borderRadius.md,
+        borderWidth: 1,
+        borderColor: colors.accentPrimary,
+    },
+    micButtonActive: {
+        backgroundColor: colors.error,
+        borderColor: colors.error,
+    },
+    micButtonText: {
         ...typography.labelMedium,
         color: colors.textPrimary,
     },

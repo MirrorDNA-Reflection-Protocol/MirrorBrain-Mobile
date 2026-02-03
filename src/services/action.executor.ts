@@ -170,15 +170,15 @@ class ActionExecutorClass {
                         const apps = await AppLauncherService.getInstalledApps();
                         const similar = apps
                             .filter(app =>
-                                app.name.toLowerCase().includes(appName.toLowerCase()) ||
-                                appName.toLowerCase().includes(app.name.toLowerCase())
+                                app.label.toLowerCase().includes(appName.toLowerCase()) ||
+                                appName.toLowerCase().includes(app.label.toLowerCase())
                             )
                             .slice(0, 3);
 
                         if (similar.length > 0) {
                             return {
                                 success: false,
-                                message: `App "${appName}" not found. Did you mean: ${similar.map(a => a.name).join(', ')}?`,
+                                message: `App "${appName}" not found. Did you mean: ${similar.map(a => a.label).join(', ')}?`,
                                 data: { suggestions: similar },
                             };
                         }

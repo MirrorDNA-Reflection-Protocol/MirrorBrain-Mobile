@@ -290,7 +290,7 @@ class BriefingServiceClass {
 
     private buildWeatherSection(weather: WeatherData): BriefingSection {
         const temp = Math.round(weather.temperature);
-        const feelsLike = Math.round(weather.feelsLike);
+        const feelsLike = Math.round(weather.feelsLike ?? weather.temperature);
         const emoji = this.getWeatherEmoji(weather.condition);
 
         return {
@@ -337,13 +337,13 @@ class BriefingServiceClass {
             const reminders = await VaultService.search('tag:reminder tag:pending');
             for (const r of reminders.slice(0, 5)) {
                 items.push({
-                    id: r.path,
+                    id: r.id,
                     text: r.title,
                     type: 'reminder',
                     action: {
                         label: 'View',
                         type: 'navigate',
-                        payload: { screen: 'vault', path: r.path },
+                        payload: { screen: 'vault', path: r.id },
                     },
                 });
             }
@@ -356,7 +356,7 @@ class BriefingServiceClass {
             const deferred = await VaultService.search('tag:decision tag:deferred');
             for (const d of deferred.slice(0, 3)) {
                 items.push({
-                    id: d.path,
+                    id: d.id,
                     text: d.title,
                     subtext: 'Deferred decision',
                     type: 'task',
@@ -437,10 +437,8 @@ ${context}
 
 Keep it personal and encouraging. Focus on what matters most today.`;
 
-            return await LLMService.complete(prompt, {
-                maxTokens: 100,
-                temperature: 0.7,
-            });
+            const result = await LLMService.complete(prompt, 100);
+            return result?.text;
         } catch {
             return undefined;
         }
@@ -457,10 +455,8 @@ Highlights: ${summary.highlights.join(', ')}
 
 Keep it warm and constructive.`;
 
-            return await LLMService.complete(prompt, {
-                maxTokens: 100,
-                temperature: 0.7,
-            });
+            const result = await LLMService.complete(prompt, 100);
+            return result?.text;
         } catch {
             return undefined;
         }

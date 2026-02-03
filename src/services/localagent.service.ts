@@ -118,7 +118,7 @@ const INTERVALS = {
 
 class LocalAgentServiceClass {
     private state: AgentState;
-    private intervals: { [key: string]: NodeJS.Timeout } = {};
+    private intervals: { [key: string]: ReturnType<typeof setInterval> | undefined } = {};
     private triggers: Trigger[] = [];
     private isInitialized = false;
 
@@ -218,7 +218,9 @@ class LocalAgentServiceClass {
         this.state.isRunning = false;
 
         // Clear all intervals
-        Object.values(this.intervals).forEach(clearInterval);
+        Object.values(this.intervals).forEach(handle => {
+            if (handle !== undefined) clearInterval(handle);
+        });
         this.intervals = {};
 
         await this.saveState();
@@ -338,7 +340,7 @@ class LocalAgentServiceClass {
         for (const alert of alerts) {
             if (alert.level === 'critical') {
                 // Haptic feedback for critical alerts
-                HapticService.trigger('warning');
+                HapticService.warning();
 
                 // Log to vault
                 await this.logToVault('critical_alert', alert);

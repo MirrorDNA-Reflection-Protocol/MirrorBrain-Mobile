@@ -369,8 +369,9 @@ class OrchestratorServiceClass {
 
     /**
      * Execute a tool with timeout and retry logic
+     * Public for MeshService to execute tools from remote task requests
      */
-    private async executeTool(
+    async executeTool(
         toolName: string,
         params: Record<string, unknown>
     ): Promise<ToolResult> {

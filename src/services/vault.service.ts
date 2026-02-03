@@ -871,6 +871,24 @@ class VaultServiceClass {
     hasExternalVault(): boolean {
         return this.hasExternalAccess;
     }
+
+    /**
+     * Save a note to vault (convenience wrapper around saveCapture)
+     * Used by ActionExecutor for 'note' and 'reminder' intents
+     */
+    async saveNote(title: string, content: string, tags?: string[]): Promise<string | null> {
+        return this.saveCapture('note', content, title, undefined, tags);
+    }
+
+    /**
+     * Create a memory spark from passive intelligence captures
+     * Used by PassiveIntelligenceService and OCRService
+     */
+    async createSpark(content: string, category?: string): Promise<string | null> {
+        const tags = category ? ['spark', category] : ['spark'];
+        const title = `Spark: ${content.slice(0, 40)}${content.length > 40 ? '...' : ''}`;
+        return this.saveCapture('note', content, title, undefined, tags);
+    }
 }
 
 /**

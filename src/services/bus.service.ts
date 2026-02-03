@@ -13,9 +13,11 @@ import RNFS from 'react-native-fs';
 import DeviceInfo from 'react-native-device-info';
 import { DeviceService } from './device.service';
 
-// Bus paths
+// Bus paths - primary and fallback
 const VAULT_PATH = '/storage/emulated/0/Obsidian/MirrorDNA-Vault';
-const BUS_PATH = `${VAULT_PATH}/.mobile_bus`;
+const VAULT_BUS_PATH = `${VAULT_PATH}/.mobile_bus`;
+const FALLBACK_BUS_PATH = '/storage/emulated/0/MirrorDNA/.mobile_bus';
+let BUS_PATH = VAULT_BUS_PATH; // Will be set during init
 
 // State interfaces
 export interface MobileState {
@@ -66,24 +68,54 @@ class MobileBusServiceClass {
             this.deviceId = await DeviceInfo.getUniqueId();
             this.deviceName = await DeviceInfo.getDeviceName();
 
-            // Ensure bus directory exists
-            const exists = await RNFS.exists(BUS_PATH);
-            if (!exists) {
-                await RNFS.mkdir(BUS_PATH);
-                console.log('[MobileBus] Created bus directory');
+            // Try primary path (vault), fall back to secondary
+            let busPath = VAULT_BUS_PATH;
+            try {
+                const vaultExists = await RNFS.exists(VAULT_PATH);
+                if (vaultExists) {
+                    const busExists = await RNFS.exists(VAULT_BUS_PATH);
+                    if (!busExists) {
+                        await RNFS.mkdir(VAULT_BUS_PATH);
+                    }
+                    busPath = VAULT_BUS_PATH;
+                    console.log('[MobileBus] Using vault path');
+                } else {
+                    throw new Error('Vault not found');
+                }
+            } catch {
+                // Fall back to secondary path
+                console.log('[MobileBus] Vault not accessible, using fallback path');
+                busPath = FALLBACK_BUS_PATH;
+                try {
+                    const fallbackExists = await RNFS.exists(FALLBACK_BUS_PATH);
+                    if (!fallbackExists) {
+                        await RNFS.mkdir(FALLBACK_BUS_PATH);
+                    }
+                } catch (mkdirErr) {
+                    console.error('[MobileBus] Could not create fallback dir:', mkdirErr);
+                }
             }
 
-            // Write initial state
-            await this.writeState();
+            // Update the global BUS_PATH
+            BUS_PATH = busPath;
+
+            // Write initial state (with error handling)
+            try {
+                await this.writeState();
+            } catch (writeErr) {
+                console.warn('[MobileBus] Initial write failed, continuing:', writeErr);
+            }
 
             // Start periodic sync (every 5 minutes)
             this.syncInterval = setInterval(() => this.sync(), 5 * 60 * 1000);
 
             this.isInitialized = true;
-            console.log(`[MobileBus] Initialized for device: ${this.deviceName} (${this.deviceId})`);
+            console.log(`[MobileBus] Initialized for device: ${this.deviceName} (${this.deviceId}) at ${busPath}`);
             return true;
         } catch (error) {
             console.error('[MobileBus] Init failed:', error);
+            // Still mark as initialized so app doesn't break
+            this.isInitialized = true;
             return false;
         }
     }

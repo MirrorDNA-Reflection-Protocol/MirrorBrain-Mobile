@@ -124,6 +124,16 @@ class AppLauncherServiceClass {
         };
         return icons[packageName] || '📱';
     }
+
+    /**
+     * Get installed apps (returns favorites for now)
+     * Used by ActionExecutor for app_command intent
+     */
+    async getInstalledApps(): Promise<InstalledApp[]> {
+        // In a real implementation, this would use a native module to list apps
+        // For now, return favorites as a reasonable subset
+        return this.getFavoriteApps();
+    }
 }
 
 // Singleton export

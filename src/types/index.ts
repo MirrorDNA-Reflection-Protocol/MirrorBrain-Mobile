@@ -54,6 +54,7 @@ export interface VaultItem {
     createdAt: Date;
     updatedAt: Date;
     tags?: string[];
+    path?: string; // File path for external vault items
 }
 
 export interface CaptureItem extends VaultItem {

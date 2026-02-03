@@ -161,9 +161,8 @@ class ClipboardWatcherClass {
 
         try {
             await VaultService.createSpark(
-                `${label}: ${capture.text.slice(0, 50)}${capture.text.length > 50 ? '...' : ''}`,
-                `**${label}** captured on ${date}\n\n\`${capture.text}\``,
-                [capture.type, 'clipboard', 'auto-captured']
+                `${label}: ${capture.text.slice(0, 50)}${capture.text.length > 50 ? '...' : ''}\n\n**${label}** captured on ${date}\n\n\`${capture.text}\``,
+                capture.type
             );
         } catch (error) {
             console.error('Failed to save clipboard to vault:', error);

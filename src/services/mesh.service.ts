@@ -1,11 +1,11 @@
 /**
- * Mesh Service — Agent Communication Network
+ * Mesh Service — Agent Communication Network (v2 - Robust)
  *
  * WebSocket client for connecting to the MirrorDNA mesh relay.
- * Enables cross-agent chat, task delegation, and presence sharing.
+ * Handles background/foreground transitions, aggressive reconnection.
  */
 
-import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
+import { AppState, AppStateStatus } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 import { OrchestratorService } from './orchestrator.service';
 
@@ -60,17 +60,23 @@ export interface PresenceMessage {
 }
 
 export type MeshMessage = ChatMessage | TaskMessage | TaskResultMessage | PresenceMessage | {
-    type: 'agents' | 'registered' | 'error';
+    type: 'agents' | 'registered' | 'error' | 'ping' | 'pong';
     [key: string]: unknown;
 };
 
 type MessageCallback = (message: MeshMessage) => void;
 type ConnectionCallback = (connected: boolean) => void;
 
-// Relay addresses — try Tailscale first, fallback to localhost (adb reverse)
-const TAILSCALE_RELAY_HOST = '100.114.247.53'; // active-mirror-hub Tailscale IP
-const LOCALHOST_RELAY_HOST = 'localhost'; // Works via adb reverse
+// Relay addresses — try multiple hosts
+const RELAY_HOSTS = [
+    'localhost',                    // ADB reverse (USB connected)
+    '100.114.247.53',              // Tailscale IP
+    '192.168.1.100',               // Common local network IP (adjust if needed)
+];
 const DEFAULT_RELAY_PORT = 8766;
+const HEARTBEAT_INTERVAL = 8000;   // 8 seconds (aggressive)
+const RECONNECT_DELAY = 1500;      // 1.5 seconds
+const CONNECTION_TIMEOUT = 5000;   // 5 second timeout per host
 
 class MeshServiceClass {
     private ws: WebSocket | null = null;
@@ -78,24 +84,28 @@ class MeshServiceClass {
     private agentName: string = '';
     private connected: boolean = false;
     private reconnecting: boolean = false;
-    private heartbeatInterval: NodeJS.Timeout | null = null;
-    private reconnectTimeout: NodeJS.Timeout | null = null;
+    private initialized: boolean = false;
+    private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+    private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+    private appStateSubscription: { remove: () => void } | null = null;
 
     private agents: Map<string, MeshAgent> = new Map();
     private messageCallbacks: Set<MessageCallback> = new Set();
     private connectionCallbacks: Set<ConnectionCallback> = new Set();
     private pendingTasks: Map<string, (result: TaskResultMessage) => void> = new Map();
 
-    private relayHost: string = TAILSCALE_RELAY_HOST;
-    private relayPort: number = DEFAULT_RELAY_PORT;
-    private useTailscale: boolean = true;
+    private connectedHost: string = '';
+    private lastMessageTime: number = 0;
+    private connectionAttempts: number = 0;
 
     /**
      * Initialize the mesh service
      */
-    async initialize(relayHost?: string, relayPort?: number): Promise<void> {
-        if (relayHost) this.relayHost = relayHost;
-        if (relayPort) this.relayPort = relayPort;
+    async initialize(): Promise<void> {
+        if (this.initialized) {
+            console.log('[MeshService] Already initialized');
+            return;
+        }
 
         // Get device info for agent identity
         try {
@@ -110,29 +120,68 @@ class MeshServiceClass {
             console.warn('[MeshService] Device info failed, using fallback:', error);
         }
 
+        // Set up AppState listener for foreground/background
+        this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
+
+        this.initialized = true;
         console.log(`[MeshService] Initialized as ${this.agentId} (${this.agentName})`);
     }
 
     /**
-     * Connect to the mesh relay (tries Tailscale first, then localhost)
+     * Handle app state changes (foreground/background)
+     */
+    private handleAppStateChange = (nextState: AppStateStatus): void => {
+        console.log(`[MeshService] App state changed to: ${nextState}`);
+
+        if (nextState === 'active') {
+            // App came to foreground - reconnect if needed
+            if (!this.connected) {
+                console.log('[MeshService] App active - attempting reconnect');
+                this.connect();
+            } else {
+                // Send heartbeat to verify connection
+                this.sendHeartbeat();
+            }
+        } else if (nextState === 'background') {
+            // Going to background - connection may be killed by Android
+            console.log('[MeshService] App going to background');
+        }
+    };
+
+    /**
+     * Connect to the mesh relay (tries multiple hosts)
      */
     async connect(): Promise<boolean> {
-        if (this.connected || this.reconnecting) {
-            return this.connected;
+        if (this.connected) {
+            console.log('[MeshService] Already connected');
+            return true;
         }
 
-        // Try Tailscale first, then localhost
-        const hosts = [TAILSCALE_RELAY_HOST, LOCALHOST_RELAY_HOST];
+        if (this.reconnecting) {
+            console.log('[MeshService] Already reconnecting...');
+            return false;
+        }
 
-        for (const host of hosts) {
-            const success = await this.tryConnect(host);
-            if (success) {
-                this.relayHost = host;
-                console.log(`[MeshService] Connected via ${host === TAILSCALE_RELAY_HOST ? 'Tailscale' : 'localhost'}`);
-                return true;
+        this.connectionAttempts++;
+        console.log(`[MeshService] Connection attempt #${this.connectionAttempts}`);
+
+        // Try each host in order
+        for (const host of RELAY_HOSTS) {
+            try {
+                const success = await this.tryConnect(host);
+                if (success) {
+                    this.connectedHost = host;
+                    this.connectionAttempts = 0; // Reset on success
+                    console.log(`[MeshService] Connected via ${host}`);
+                    return true;
+                }
+            } catch (error) {
+                console.log(`[MeshService] Failed to connect to ${host}:`, error);
             }
         }
 
+        // All hosts failed - schedule reconnect
+        console.log('[MeshService] All hosts failed, scheduling reconnect');
         this.scheduleReconnect();
         return false;
     }
@@ -143,22 +192,32 @@ class MeshServiceClass {
     private tryConnect(host: string): Promise<boolean> {
         return new Promise((resolve) => {
             try {
-                const url = `ws://${host}:${this.relayPort}`;
+                const url = `ws://${host}:${DEFAULT_RELAY_PORT}`;
                 console.log(`[MeshService] Trying ${url}...`);
 
                 const ws = new WebSocket(url);
+                let resolved = false;
+
                 const timeout = setTimeout(() => {
-                    console.log(`[MeshService] Timeout connecting to ${host}`);
-                    ws.close();
-                    resolve(false);
-                }, 3000); // 3 second timeout
+                    if (!resolved) {
+                        resolved = true;
+                        console.log(`[MeshService] Timeout connecting to ${host}`);
+                        try { ws.close(); } catch (e) { }
+                        resolve(false);
+                    }
+                }, CONNECTION_TIMEOUT);
 
                 ws.onopen = () => {
+                    if (resolved) return;
+                    resolved = true;
                     clearTimeout(timeout);
                     console.log(`[MeshService] Connected to ${host}`);
+
                     this.ws = ws;
                     this.connected = true;
                     this.reconnecting = false;
+                    this.lastMessageTime = Date.now();
+
                     this.setupWebSocketHandlers();
                     this.register();
                     this.startHeartbeat();
@@ -166,21 +225,23 @@ class MeshServiceClass {
                     resolve(true);
                 };
 
-                ws.onerror = () => {
+                ws.onerror = (error) => {
+                    if (resolved) return;
+                    resolved = true;
                     clearTimeout(timeout);
-                    console.log(`[MeshService] Failed to connect to ${host}`);
+                    console.log(`[MeshService] Error connecting to ${host}:`, error);
                     resolve(false);
                 };
 
                 ws.onclose = () => {
+                    if (resolved) return;
+                    resolved = true;
                     clearTimeout(timeout);
-                    if (!this.connected) {
-                        resolve(false);
-                    }
+                    resolve(false);
                 };
 
             } catch (error) {
-                console.error(`[MeshService] Error connecting to ${host}:`, error);
+                console.error(`[MeshService] Exception connecting to ${host}:`, error);
                 resolve(false);
             }
         });
@@ -193,6 +254,7 @@ class MeshServiceClass {
         if (!this.ws) return;
 
         this.ws.onmessage = (event) => {
+            this.lastMessageTime = Date.now();
             this.handleMessage(event.data);
         };
 
@@ -200,30 +262,53 @@ class MeshServiceClass {
             console.error('[MeshService] WebSocket error:', error);
         };
 
-        this.ws.onclose = () => {
-            console.log('[MeshService] Disconnected from relay');
-            this.connected = false;
-            this.stopHeartbeat();
-            this.notifyConnectionCallbacks(false);
-            this.scheduleReconnect();
+        this.ws.onclose = (event) => {
+            console.log(`[MeshService] Disconnected (code: ${event.code}, reason: ${event.reason})`);
+            this.handleDisconnection();
         };
+    }
+
+    /**
+     * Handle disconnection
+     */
+    private handleDisconnection(): void {
+        const wasConnected = this.connected;
+        this.connected = false;
+        this.ws = null;
+        this.stopHeartbeat();
+
+        if (wasConnected) {
+            this.notifyConnectionCallbacks(false);
+        }
+
+        // Only auto-reconnect if app is in foreground
+        if (AppState.currentState === 'active') {
+            this.scheduleReconnect();
+        }
     }
 
     /**
      * Disconnect from the mesh
      */
     disconnect(): void {
+        console.log('[MeshService] Disconnecting...');
         this.stopHeartbeat();
+
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
             this.reconnectTimeout = null;
         }
+
+        this.reconnecting = false;
+
         if (this.ws) {
-            this.ws.close();
+            try {
+                this.ws.close(1000, 'Client disconnect');
+            } catch (e) { }
             this.ws = null;
         }
+
         this.connected = false;
-        this.reconnecting = false;
     }
 
     /**
@@ -231,13 +316,8 @@ class MeshServiceClass {
      */
     private register(): void {
         const capabilities = [
-            'llm',
-            'tools',
-            'notifications',
-            'sms',
-            'camera',
-            'location',
-            'automation'
+            'llm', 'tools', 'notifications', 'sms',
+            'camera', 'location', 'automation'
         ];
 
         this.send({
@@ -255,7 +335,12 @@ class MeshServiceClass {
     /**
      * Send a chat message
      */
-    sendChat(to: string, content: string): void {
+    sendChat(to: string, content: string): boolean {
+        if (!this.connected) {
+            console.warn('[MeshService] Cannot send - not connected');
+            return false;
+        }
+
         const message: ChatMessage = {
             type: 'chat',
             id: this.generateId('msg'),
@@ -265,14 +350,15 @@ class MeshServiceClass {
             timestamp: new Date().toISOString()
         };
 
-        this.send(message);
+        this.send(message as unknown as Record<string, unknown>);
+        return true;
     }
 
     /**
      * Broadcast a chat message to all agents
      */
-    broadcast(content: string): void {
-        this.sendChat('*', content);
+    broadcast(content: string): boolean {
+        return this.sendChat('*', content);
     }
 
     /**
@@ -285,6 +371,19 @@ class MeshServiceClass {
         timeout: number = 30000
     ): Promise<TaskResultMessage> {
         return new Promise((resolve) => {
+            if (!this.connected) {
+                resolve({
+                    type: 'task_result',
+                    id: 'error',
+                    from: to,
+                    to: this.agentId,
+                    success: false,
+                    error: 'Not connected',
+                    timestamp: new Date().toISOString()
+                });
+                return;
+            }
+
             const taskId = this.generateId('task');
 
             const message: TaskMessage = {
@@ -298,7 +397,6 @@ class MeshServiceClass {
                 timestamp: new Date().toISOString()
             };
 
-            // Set up timeout
             const timeoutHandle = setTimeout(() => {
                 this.pendingTasks.delete(taskId);
                 resolve({
@@ -312,14 +410,13 @@ class MeshServiceClass {
                 });
             }, timeout);
 
-            // Store resolver
             this.pendingTasks.set(taskId, (result) => {
                 clearTimeout(timeoutHandle);
                 this.pendingTasks.delete(taskId);
                 resolve(result);
             });
 
-            this.send(message);
+            this.send(message as unknown as Record<string, unknown>);
         });
     }
 
@@ -363,6 +460,8 @@ class MeshServiceClass {
      */
     onConnectionChange(callback: ConnectionCallback): () => void {
         this.connectionCallbacks.add(callback);
+        // Immediately notify of current state
+        callback(this.connected);
         return () => this.connectionCallbacks.delete(callback);
     }
 
@@ -370,7 +469,7 @@ class MeshServiceClass {
      * Check if connected
      */
     isConnected(): boolean {
-        return this.connected;
+        return this.connected && this.ws !== null;
     }
 
     /**
@@ -380,13 +479,58 @@ class MeshServiceClass {
         return this.agentId;
     }
 
+    /**
+     * Force reconnection
+     */
+    forceReconnect(): void {
+        console.log('[MeshService] Force reconnect requested');
+        this.disconnect();
+        setTimeout(() => this.connect(), 500);
+    }
+
+    /**
+     * Health check
+     */
+    checkHealth(): boolean {
+        if (!this.connected || !this.ws) {
+            this.scheduleReconnect();
+            return false;
+        }
+
+        // Stale connection check (30 seconds)
+        if (this.lastMessageTime > 0 && Date.now() - this.lastMessageTime > 30000) {
+            console.log('[MeshService] Connection stale, reconnecting...');
+            this.forceReconnect();
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Cleanup on app close
+     */
+    cleanup(): void {
+        this.disconnect();
+        if (this.appStateSubscription) {
+            this.appStateSubscription.remove();
+            this.appStateSubscription = null;
+        }
+        this.initialized = false;
+    }
+
     // ─────────────────────────────────────────────────────────────────────────────
     // Internal Methods
     // ─────────────────────────────────────────────────────────────────────────────
 
     private send(message: Record<string, unknown>): void {
         if (this.ws && this.connected) {
-            this.ws.send(JSON.stringify(message));
+            try {
+                this.ws.send(JSON.stringify(message));
+            } catch (error) {
+                console.error('[MeshService] Send error:', error);
+                this.handleDisconnection();
+            }
         }
     }
 
@@ -402,7 +546,7 @@ class MeshServiceClass {
                     break;
 
                 case 'agents':
-                    this.handleAgentsList(message as { agents: MeshAgent[] });
+                    this.handleAgentsList(message as unknown as { agents: MeshAgent[] });
                     break;
 
                 case 'presence':
@@ -417,12 +561,12 @@ class MeshServiceClass {
                     this.handleTaskResult(message as TaskResultMessage);
                     break;
 
-                case 'chat':
-                    // Pass through to callbacks
-                    break;
+                case 'ping':
+                    this.send({ type: 'pong', agent_id: this.agentId });
+                    return;
 
                 case 'error':
-                    console.error('[MeshService] Error:', (message as { error: string }).error);
+                    console.error('[MeshService] Server error:', (message as unknown as { error: string }).error);
                     break;
             }
 
@@ -445,7 +589,7 @@ class MeshServiceClass {
         for (const agent of message.agents) {
             this.agents.set(agent.id, agent);
         }
-        console.log(`[MeshService] Updated agents list: ${this.agents.size} agents`);
+        console.log(`[MeshService] Updated agents: ${this.agents.size}`);
     }
 
     private handlePresence(message: PresenceMessage): void {
@@ -467,13 +611,11 @@ class MeshServiceClass {
         console.log(`[MeshService] Incoming task: ${message.action} from ${message.from}`);
 
         try {
-            // Execute task via orchestrator
             const result = await OrchestratorService.executeTool(
                 message.action,
                 message.params
             );
 
-            // Send result back
             this.send({
                 type: 'task_result',
                 id: message.id,
@@ -506,12 +648,25 @@ class MeshServiceClass {
     }
 
     private startHeartbeat(): void {
+        this.stopHeartbeat();
+
+        // Send first heartbeat
+        this.sendHeartbeat();
+
+        // Then every 8 seconds
         this.heartbeatInterval = setInterval(() => {
+            this.sendHeartbeat();
+        }, HEARTBEAT_INTERVAL);
+    }
+
+    private sendHeartbeat(): void {
+        if (this.ws && this.connected) {
             this.send({
                 type: 'heartbeat',
-                agent_id: this.agentId
+                agent_id: this.agentId,
+                timestamp: new Date().toISOString()
             });
-        }, 15000);
+        }
     }
 
     private stopHeartbeat(): void {
@@ -523,14 +678,21 @@ class MeshServiceClass {
 
     private scheduleReconnect(): void {
         if (this.reconnecting) return;
+        if (AppState.currentState !== 'active') {
+            console.log('[MeshService] App not active, skipping reconnect');
+            return;
+        }
 
         this.reconnecting = true;
-        console.log('[MeshService] Scheduling reconnect in 5s...');
+
+        // Exponential backoff: 1.5s, 3s, 6s, max 30s
+        const delay = Math.min(RECONNECT_DELAY * Math.pow(2, Math.min(this.connectionAttempts, 4)), 30000);
+        console.log(`[MeshService] Reconnecting in ${delay / 1000}s...`);
 
         this.reconnectTimeout = setTimeout(() => {
             this.reconnecting = false;
             this.connect();
-        }, 5000);
+        }, delay);
     }
 
     private notifyConnectionCallbacks(connected: boolean): void {

@@ -330,13 +330,10 @@ Respond in JSON format:
   "goals": ["suggested goal 1", "suggested goal 2"]
 }`;
 
-            const response = await LLMService.complete(prompt, {
-                maxTokens: 300,
-                temperature: 0.7,
-            });
+            const response = await LLMService.complete(prompt, 300);
 
             // Try to parse JSON response
-            const jsonMatch = response.match(/\{[\s\S]*\}/);
+            const jsonMatch = response?.text?.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 const parsed = JSON.parse(jsonMatch[0]);
                 return {

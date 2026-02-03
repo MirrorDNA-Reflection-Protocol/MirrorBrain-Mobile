@@ -80,6 +80,21 @@ class HapticServiceClass {
     impact(): void {
         this.trigger('medium');
     }
+
+    /**
+     * Attention feedback - for important notifications/alerts
+     * Used by NudgeService
+     */
+    attention(): void {
+        this.trigger('heavy');
+    }
+
+    /**
+     * Warning feedback - for gentle warnings
+     */
+    warning(): void {
+        this.trigger('error');
+    }
 }
 
 // Singleton export

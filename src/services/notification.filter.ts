@@ -302,12 +302,9 @@ Consider:
 
 Classification:`;
 
-            const response = await LLMService.complete(prompt, {
-                maxTokens: 10,
-                temperature: 0.1,
-            });
+            const response = await LLMService.complete(prompt, 10);
 
-            const classification = response.trim().toUpperCase();
+            const classification = (response?.text || '').trim().toUpperCase();
             let category: NotificationCategory = 'informational';
             let reason = 'AI classification';
 
