@@ -145,14 +145,10 @@ class DaemonService : Service() {
     }
 
     private fun acquireWakeLock() {
-        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-        wakeLock = powerManager.newWakeLock(
-            PowerManager.PARTIAL_WAKE_LOCK,
-            "MirrorBrain::DaemonWakeLock"
-        ).apply {
-            acquire(10 * 60 * 1000L) // 10 minutes max
-        }
-        Log.d(TAG, "Wake lock acquired")
+        // DISABLED: Wake locks drain battery significantly
+        // The foreground service notification is sufficient to keep the process alive
+        // JS orchestration handles all intelligence - no need for CPU wake lock
+        Log.d(TAG, "Wake lock DISABLED for battery savings")
     }
 
     private fun releaseWakeLock() {
@@ -166,26 +162,24 @@ class DaemonService : Service() {
     }
 
     private fun startHeartbeat() {
+        // REDUCED: Heartbeat every 5 minutes instead of 1 minute for battery savings
+        val BATTERY_FRIENDLY_INTERVAL = 5 * 60 * 1000L  // 5 minutes
+
         scheduler = Executors.newSingleThreadScheduledExecutor()
         scheduler?.scheduleAtFixedRate({
             heartbeatCount++
             Log.d(TAG, "Heartbeat #$heartbeatCount")
 
-            // Refresh wake lock
-            wakeLock?.let {
-                if (!it.isHeld) {
-                    it.acquire(10 * 60 * 1000L)
-                }
-            }
+            // NO wake lock refresh - let Android manage CPU
 
-            // Run daemon tasks
+            // Run daemon tasks (lightweight)
             RootDaemon.onHeartbeat(heartbeatCount)
 
-            // Update notification occasionally
-            if (heartbeatCount % 5 == 0L) {
-                updateNotification("Active for ${heartbeatCount} minutes")
+            // Update notification every 30 minutes
+            if (heartbeatCount % 6 == 0L) {
+                updateNotification("Active")
             }
-        }, HEARTBEAT_INTERVAL_MS, HEARTBEAT_INTERVAL_MS, TimeUnit.MILLISECONDS)
+        }, BATTERY_FRIENDLY_INTERVAL, BATTERY_FRIENDLY_INTERVAL, TimeUnit.MILLISECONDS)
     }
 
     private fun stopHeartbeat() {
