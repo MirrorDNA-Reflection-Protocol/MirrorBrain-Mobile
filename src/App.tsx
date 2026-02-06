@@ -1,7 +1,7 @@
 /**
  * MirrorBrain Mobile — Root App Component
  *
- * Sovereign launcher with 4 panels.
+ * Sovereign launcher with 5 panels (PULSE first).
  * Navigation: Swipe. Minimal dot indicator.
  */
 
@@ -17,7 +17,7 @@ import {
     NativeScrollEvent,
     Platform,
 } from 'react-native';
-import { NowScreen, AskScreen, VaultScreen, ActionsScreen } from './screens';
+import { PulseScreen, NowScreen, AskScreen, VaultScreen, ActionsScreen } from './screens';
 import { IdentityImportModal } from './components';
 import {
     VaultService,
@@ -39,7 +39,7 @@ interface Panel {
 
 export const App: React.FC = () => {
     const scrollViewRef = useRef<ScrollView>(null);
-    const [currentPanel, setCurrentPanel] = useState<PanelName>('NOW');
+    const [currentPanel, setCurrentPanel] = useState<PanelName>('PULSE');
     const [isOnline, setIsOnline] = useState(false);
     const [identityLoaded, setIdentityLoaded] = useState(false);
     const [showIdentityModal, setShowIdentityModal] = useState(false);
@@ -87,6 +87,7 @@ export const App: React.FC = () => {
     };
 
     const panels: Panel[] = [
+        { key: 'PULSE', component: <PulseScreen /> },
         { key: 'NOW', component: <NowScreen isOnline={isOnline} /> },
         {
             key: 'ASK',

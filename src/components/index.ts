@@ -8,3 +8,4 @@ export * from './AppGridWidget';
 export * from './IdentityPulseWidget';
 export * from './IdentityImportModal';
 export * from './Logo';
+export * from './VoiceDispatchModal';

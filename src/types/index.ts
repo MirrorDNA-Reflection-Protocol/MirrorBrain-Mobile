@@ -4,7 +4,7 @@
  */
 
 // Panel types from spec Part II
-export type PanelName = 'NOW' | 'ASK' | 'VAULT' | 'ACTIONS';
+export type PanelName = 'PULSE' | 'NOW' | 'ASK' | 'VAULT' | 'ACTIONS';
 
 // NOW Panel types from spec Part III
 export interface NowPanelData {
