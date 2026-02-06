@@ -8,6 +8,12 @@ export { LLMService, AVAILABLE_MODELS, type ModelId } from './llm.service';
 export { CalendarService, type CalendarEvent } from './calendar.service';
 export { VoiceService } from './voice.service';
 export { TTSService } from './tts.service';
+export { AssistantService, type AssistantConfig, type AssistantEvent, type AssistantTrigger } from './assistant.service';
+
+// Sovereign AI — Local-First Intelligence
+export { LifeContextService, type ContextEntry, type ContextType, type ContextQuery } from './lifeContext.service';
+export { KnowledgeGraphService, type Entity, type Relationship, type EntityType } from './knowledgeGraph.service';
+export { PredictiveService, type PredictedQuery, type QueryPattern } from './predictive.service';
 export { SyncService, type SyncPackage } from './sync.service';
 export { DeviceService } from './device.service';
 export { AppLauncherService, type InstalledApp } from './applauncher.service';
@@ -46,6 +52,9 @@ export {
     type AgentTask,
     type Trigger,
 } from './localagent.service';
+
+// Router Service — MCP Router Client
+export { RouterService } from './router.service';
 
 // Mobile Bus — Hub Communication
 export {

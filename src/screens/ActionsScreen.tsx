@@ -20,7 +20,7 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
-import { VaultService, CalendarService, VoiceService, FocusService, type CalendarEvent } from '../services';
+import { VaultService, CalendarService, VoiceService, FocusService, RouterService, type CalendarEvent } from '../services';
 import { BriefingScreen } from './BriefingScreen';
 import { RelationshipsScreen } from './RelationshipsScreen';
 import { DigestScreen } from './DigestScreen';
@@ -233,12 +233,17 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
 
             // Save if we have text
             if (recordingText.trim()) {
+                // Local-first save
                 await VaultService.saveCapture(
                     'voice',
                     recordingText,
                     `Voice - ${new Date().toLocaleTimeString()}`
                 );
-                Alert.alert('Saved', 'Transcription saved to vault');
+                // Write through Router (queues if offline)
+                const title = `Voice - ${new Date().toLocaleTimeString()}`;
+                const routerResult = await RouterService.vaultWriteDraft(title, recordingText, undefined, ['capture', 'voice']);
+                const suffix = routerResult.queued ? ' (will sync when online)' : '';
+                Alert.alert('Saved', `Transcription saved to vault${suffix}`);
                 setRecordingText('');
             }
         } else {
@@ -262,6 +267,7 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
         setIsSaving(true);
 
         try {
+            // Always save locally first (local-first)
             if (!VaultService.isInitialized()) {
                 await VaultService.initialize();
             }
@@ -272,8 +278,13 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
                 captureTitle.trim() || undefined
             );
 
+            // Also write through Router (queues if offline)
+            const title = captureTitle.trim() || `Note - ${new Date().toLocaleDateString()}`;
+            const routerResult = await RouterService.vaultWriteDraft(title, captureText.trim(), undefined, ['capture', 'note']);
+
             if (id) {
-                Alert.alert('Saved', 'Note captured to vault');
+                const suffix = routerResult.queued ? ' (will sync when online)' : '';
+                Alert.alert('Saved', `Note captured to vault${suffix}`);
                 setCaptureText('');
                 setCaptureTitle('');
                 setCaptureModalVisible(false);

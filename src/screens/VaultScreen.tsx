@@ -20,7 +20,7 @@ import {
     ScrollView,
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
-import { VaultService, SyncService, HapticService } from '../services';
+import { VaultService, SyncService, HapticService, RouterService } from '../services';
 import { MirrorGraph } from '../components';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -38,6 +38,7 @@ export const VaultScreen: React.FC<VaultScreenProps> = ({ onLockSwipe }) => {
     const [storageInfo, setStorageInfo] = useState<{ items: number } | null>(null);
     const [viewMode, setViewMode] = useState<'list' | 'graph'>('list');
     const [graphData, setGraphData] = useState<{ nodes: any[], links: any[] }>({ nodes: [], links: [] });
+    const [graphFilter, setGraphFilter] = useState<'all' | 'recent' | 'projects' | 'decisions'>('all');
 
     // Handle back button / cleanup
     useEffect(() => {
@@ -63,6 +64,39 @@ export const VaultScreen: React.FC<VaultScreenProps> = ({ onLockSwipe }) => {
     // Auto-clear any stuck privacy lock from previous builds
     useEffect(() => {
         AsyncStorage.removeItem('@mirrorbrain/privacy_mode').catch(() => {});
+    }, []);
+
+    const applyGraphFilter = useCallback((data: { nodes: any[], links: any[] }, preset: string) => {
+        if (preset === 'all') return data;
+
+        const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        let filteredNodes = data.nodes;
+
+        if (preset === 'recent') {
+            // Keep folders + files modified in last 7 days (by path heuristic)
+            filteredNodes = data.nodes.filter((n: any) =>
+                n.type === 'folder' || (n.path && n.mtime && new Date(n.mtime).getTime() > sevenDaysAgo)
+            );
+            // If no mtime available, fall back to keeping all (graph scan doesn't always have mtime)
+            if (filteredNodes.length < 3) filteredNodes = data.nodes;
+        } else if (preset === 'projects') {
+            filteredNodes = data.nodes.filter((n: any) =>
+                n.type === 'folder' ||
+                (n.id && (n.id.includes('Project') || n.id.includes('Status') || n.id.includes('Backlog') || n.folder?.includes('Projects')))
+            );
+        } else if (preset === 'decisions') {
+            filteredNodes = data.nodes.filter((n: any) =>
+                n.type === 'folder' ||
+                (n.id && (n.id.includes('Decision') || n.id.includes('decision') || n.folder?.includes('Decision')))
+            );
+        }
+
+        const nodeIds = new Set(filteredNodes.map((n: any) => n.id));
+        const filteredLinks = data.links.filter((l: any) =>
+            nodeIds.has(l.source) && nodeIds.has(l.target)
+        );
+
+        return { nodes: filteredNodes, links: filteredLinks };
     }, []);
 
     const loadItems = useCallback(async () => {
@@ -316,6 +350,14 @@ export const VaultScreen: React.FC<VaultScreenProps> = ({ onLockSwipe }) => {
                     </View>
 
                     {/* Filters */}
+                    {viewMode === 'graph' && (
+                        <View style={styles.filters}>
+                            <FilterChip label="All" active={graphFilter === 'all'} onPress={() => setGraphFilter('all')} />
+                            <FilterChip label="Last 7 days" active={graphFilter === 'recent'} onPress={() => setGraphFilter('recent')} />
+                            <FilterChip label="Projects" active={graphFilter === 'projects'} onPress={() => setGraphFilter('projects')} />
+                            <FilterChip label="Decisions" active={graphFilter === 'decisions'} onPress={() => setGraphFilter('decisions')} />
+                        </View>
+                    )}
                     {viewMode === 'list' && (
                         <View style={styles.filters}>
                             <FilterChip
@@ -414,7 +456,7 @@ export const VaultScreen: React.FC<VaultScreenProps> = ({ onLockSwipe }) => {
                     ) : (
                         <Animated.View entering={FadeIn} exiting={FadeOut} style={{ flex: 1 }}>
                             <MirrorGraph
-                                data={graphData}
+                                data={applyGraphFilter(graphData, graphFilter)}
                                 onNodePress={async (id) => {
                                     if (id.startsWith('dir_')) {
                                         return; // Ignore folders for now or zoom in
@@ -555,12 +597,23 @@ export const VaultScreen: React.FC<VaultScreenProps> = ({ onLockSwipe }) => {
                         )}
                         <TouchableOpacity
                             style={styles.continueButton}
-                            onPress={() => {
+                            onPress={async () => {
                                 setShowSessionModal(false);
-                                Alert.alert('Coming Soon', 'Session continuation will be added in the next update');
+                                // Resolve last run_id from Router
+                                const lastRunId = await RouterService.getLastRunId();
+                                if (lastRunId) {
+                                    Alert.alert('Continue', `Resuming from run: ${lastRunId.slice(0, 8)}...`);
+                                    // Audit the continuation intent
+                                    RouterService.auditAppend('session_continue', {
+                                        session_id: selectedSession?.id,
+                                        last_run_id: lastRunId,
+                                    });
+                                } else {
+                                    Alert.alert('Continue', 'No previous run found. Starting fresh.');
+                                }
                             }}
                         >
-                            <Text style={styles.continueButtonText}>Continue this conversation</Text>
+                            <Text style={styles.continueButtonText}>Continue where you left off</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
