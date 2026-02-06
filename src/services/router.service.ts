@@ -137,7 +137,96 @@ class RouterServiceClass {
         return null;
     }
 
+    // --- Analytics + Observability ---
+
+    /**
+     * Get analytics summary
+     */
+    async getAnalytics(project?: string): Promise<RouterResponse<{
+        total_runs: number;
+        success_rate_by_skill: Record<string, number>;
+        retry_rate: number;
+        skill_reliability_score: Record<string, number>;
+    }>> {
+        const url = project ? `/analytics/summary?project=${project}` : '/analytics/summary';
+        return this._get(url);
+    }
+
+    /**
+     * Score a run (confidence/stability/trust)
+     */
+    async scoreRun(runId: string, project: string): Promise<RouterResponse<{
+        confidence_score: number;
+        stability_score: number;
+        trust_score: number;
+        breakdown: Record<string, number>;
+    }>> {
+        return this._post('/run/score', { run_id: runId, project });
+    }
+
+    /**
+     * Replay a historical run in sandbox mode
+     */
+    async replayRun(runId: string, project: string): Promise<RouterResponse<{
+        replay_id: string;
+        verdict: { would_succeed: boolean; risk: string; issues: string[] };
+    }>> {
+        return this._post('/replay/run', { run_id: runId, project });
+    }
+
+    /**
+     * Get Router health (includes kill switch + policy version)
+     */
+    async getHealth(): Promise<RouterResponse<{
+        status: string;
+        kill_switch: string;
+        policy_version: string;
+    }>> {
+        return this._get('/health');
+    }
+
+    /**
+     * Get run lifecycle state
+     */
+    async getRun(runId: string, project: string): Promise<RouterResponse<{
+        state: string;
+        confidence?: Record<string, number>;
+    }>> {
+        return this._post('/run/get', { run_id: runId, project });
+    }
+
+    /**
+     * Get evidence for a run
+     */
+    async getEvidence(runId: string, project: string): Promise<RouterResponse<{
+        state: string;
+        run_hash: string;
+        input_hash: string;
+        output_hash: string;
+    }>> {
+        return this._post('/evidence/get', { run_id: runId, project });
+    }
+
     // --- Internal ---
+
+    private async _get<T = unknown>(endpoint: string): Promise<RouterResponse<T>> {
+        if (!this.online) {
+            return { ok: false, error: 'offline' };
+        }
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+            const res = await fetch(`${this.baseUrl}${endpoint}`, { signal: controller.signal });
+            clearTimeout(timeout);
+            if (!res.ok) {
+                return { ok: false, error: `HTTP ${res.status}` };
+            }
+            const data = await res.json() as T;
+            return { ok: true, data };
+        } catch (err: any) {
+            return { ok: false, error: err?.message || 'network error' };
+        }
+    }
 
     private async _post<T = unknown>(endpoint: string, body: Record<string, unknown>): Promise<RouterResponse<T>> {
         if (!this.online) {
