@@ -24,7 +24,8 @@ import {
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
 import { GlassView } from '../components';
-import { RouterService, HapticService } from '../services';
+import { RouterService, HapticService, DeviceOrchestratorService } from '../services';
+import type { RunRecord } from '../services/device_orchestrator.service';
 import { RunsFeedScreen } from './RunsFeedScreen';
 import { TrustPanelScreen } from './TrustPanelScreen';
 import { VoiceDispatchModal } from '../components/VoiceDispatchModal';
@@ -52,6 +53,8 @@ export const PulseScreen: React.FC = () => {
     const [showRuns, setShowRuns] = useState(false);
     const [showTrust, setShowTrust] = useState(false);
     const [showVoice, setShowVoice] = useState(false);
+    const [deviceRuns, setDeviceRuns] = useState<RunRecord[]>([]);
+    const [orchOnline, setOrchOnline] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
 
     useEffect(() => {
@@ -66,12 +69,18 @@ export const PulseScreen: React.FC = () => {
     const loadData = async () => {
         try {
             await RouterService.initialize();
+            await DeviceOrchestratorService.initialize();
             const [healthRes, analyticsRes] = await Promise.all([
                 RouterService.getHealth(),
                 RouterService.getAnalytics(),
             ]);
             if (healthRes.ok && healthRes.data) setHealth(healthRes.data);
             if (analyticsRes.ok && analyticsRes.data) setAnalytics(analyticsRes.data as AnalyticsData);
+
+            // Load device orchestrator state
+            setOrchOnline(DeviceOrchestratorService.isOnline());
+            const runs = await DeviceOrchestratorService.getRecentRuns(5);
+            setDeviceRuns(runs);
         } catch {
             // Offline — show degraded
         } finally {
@@ -159,6 +168,41 @@ export const PulseScreen: React.FC = () => {
                         ))}
                     </GlassView>
                 )}
+
+                {/* Device Actions (Ambient OS) */}
+                <GlassView style={styles.deviceCard} variant="subtle">
+                    <View style={styles.deviceHeader}>
+                        <Text style={styles.sectionTitle}>
+                            {glyphs.decision} Device Actions
+                        </Text>
+                        <View style={[styles.pulseDot, { backgroundColor: orchOnline ? colors.success : colors.offline }]} />
+                    </View>
+                    {deviceRuns.length > 0 ? (
+                        deviceRuns.slice(0, 3).map(run => (
+                            <View key={run.run_id} style={styles.deviceRunRow}>
+                                <Text style={[styles.deviceRunStatus, {
+                                    color: run.status === 'dispatched' ? colors.accentPrimary
+                                        : run.status === 'completed' ? colors.success
+                                        : run.status === 'failed' || run.status === 'blocked' ? colors.error
+                                        : colors.textMuted
+                                }]}>
+                                    {run.status === 'dispatched' ? '>' : run.status === 'completed' ? '+' : run.status === 'blocked' ? 'x' : '-'}
+                                </Text>
+                                <Text style={styles.deviceRunSkill}>{run.skill_id}</Text>
+                                <Text style={styles.deviceRunArgs} numberOfLines={1}>
+                                    {Object.values(run.args).join(', ')}
+                                </Text>
+                            </View>
+                        ))
+                    ) : (
+                        <Text style={styles.deviceEmpty}>No device actions yet</Text>
+                    )}
+                    {DeviceOrchestratorService.getQueueSize() > 0 && (
+                        <Text style={styles.deviceQueue}>
+                            {DeviceOrchestratorService.getQueueSize()} queued
+                        </Text>
+                    )}
+                </GlassView>
 
                 {/* Quick Actions */}
                 <Text style={styles.sectionHeader}>Quick Actions</Text>
@@ -259,6 +303,15 @@ const styles = StyleSheet.create({
     actionInner: { padding: spacing.md, alignItems: 'center' },
     actionIcon: { fontSize: 28, marginBottom: spacing.xs },
     actionLabel: { ...typography.labelMedium, color: colors.textSecondary },
+
+    deviceCard: { padding: spacing.md, marginBottom: spacing.md },
+    deviceHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
+    deviceRunRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 3, gap: spacing.xs },
+    deviceRunStatus: { ...typography.labelSmall, fontWeight: '700', width: 14 },
+    deviceRunSkill: { ...typography.bodySmall, color: colors.textPrimary, width: 90 },
+    deviceRunArgs: { ...typography.bodySmall, color: colors.textMuted, flex: 1 },
+    deviceEmpty: { ...typography.bodySmall, color: colors.textMuted, fontStyle: 'italic' },
+    deviceQueue: { ...typography.labelSmall, color: colors.warning, marginTop: spacing.xs },
 
     queueCard: { padding: spacing.sm },
     queueText: { ...typography.bodySmall, color: colors.warning, textAlign: 'center' },

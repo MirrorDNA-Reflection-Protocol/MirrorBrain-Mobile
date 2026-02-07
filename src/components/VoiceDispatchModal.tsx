@@ -18,7 +18,8 @@ import {
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
 import { GlassView } from './GlassView';
-import { RouterService, HapticService } from '../services';
+import { RouterService, HapticService, DeviceOrchestratorService } from '../services';
+import { DeviceService } from '../services/device.service';
 
 interface VoiceDispatchModalProps {
     visible: boolean;
@@ -67,41 +68,43 @@ export const VoiceDispatchModal: React.FC<VoiceDispatchModalProps> = ({ visible,
         await new Promise(resolve => setTimeout(resolve, 1200));
 
         const mockTranscripts = [
-            'Check system health and report any issues',
-            'Run analytics summary for SovereignLoop',
-            'Score the last completed run',
-            'Replay the most recent failed run',
-            'Show me the trust metrics for today',
+            'Open Obsidian',
+            'Do not disturb on',
+            'Open Chrome',
+            'Open Settings',
+            'Do not disturb off',
         ];
         const simTranscript = mockTranscripts[Math.floor(Math.random() * mockTranscripts.length)];
         setTranscript(simTranscript);
 
-        // Dispatch to Router as a vault draft (captures the voice command)
+        // Dispatch to Orchestrator (Ambient OS Mode C)
         try {
-            const res = await RouterService.vaultWriteDraft(
-                `Voice Dispatch: ${simTranscript.slice(0, 50)}`,
-                `**Voice Command**\n\n> ${simTranscript}\n\nDispatched at: ${new Date().toISOString()}`,
-                'SovereignLoop',
-                ['voice-dispatch'],
+            const deviceId = 'phone-local';
+            const orchResult = await DeviceOrchestratorService.dispatch(
+                simTranscript,
+                deviceId,
             );
 
-            // Also audit the dispatch
+            // Also audit the dispatch via Router
             await RouterService.auditAppend('voice_dispatch', {
                 transcript: simTranscript,
-                dispatched: true,
-                queued: res.queued || false,
+                dispatched: orchResult.ok,
+                queued: orchResult.queued || false,
+                run_id: orchResult.run?.run_id,
+                skill_id: orchResult.run?.skill_id,
+                status: orchResult.run?.status,
             });
 
-            if (res.ok) {
+            if (orchResult.ok && orchResult.run) {
                 HapticService.success();
                 setState('dispatched');
-                setLastResult(`Dispatched: "${simTranscript}"`);
-            } else if (res.queued) {
+                setLastResult(`${orchResult.run.skill_id}: ${JSON.stringify(orchResult.run.args)}`);
+            } else if (orchResult.queued) {
                 HapticService.select();
                 setState('dispatched');
                 setLastResult(`Queued (offline): "${simTranscript}"`);
             } else {
-                throw new Error(res.error || 'dispatch failed');
+                throw new Error(orchResult.error || orchResult.run?.error || 'dispatch failed');
             }
         } catch (err: any) {
             HapticService.error();

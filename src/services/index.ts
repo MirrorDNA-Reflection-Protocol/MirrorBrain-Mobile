@@ -56,6 +56,15 @@ export {
 // Router Service — MCP Router Client
 export { RouterService } from './router.service';
 
+// Device Orchestrator — Ambient OS (Mode C)
+export {
+    DeviceOrchestratorService,
+    type RunRecord,
+    type DeviceCommand,
+    type DeviceStatus,
+    type SkillDef,
+} from './device_orchestrator.service';
+
 // Mobile Bus — Hub Communication
 export {
     MobileBusService,
