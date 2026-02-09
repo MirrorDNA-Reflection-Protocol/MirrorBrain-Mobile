@@ -22,6 +22,8 @@ import {
 import { colors, typography, spacing, glyphs } from '../theme';
 import { VaultService, SyncService, HapticService, RouterService } from '../services';
 import { MirrorGraph } from '../components';
+import { GraphScreen, graphLayoutService } from '../graph';
+import type { GraphSnapshot } from '../graph';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { VaultItem, ChatMessage } from '../types';
@@ -36,9 +38,11 @@ export const VaultScreen: React.FC<VaultScreenProps> = ({ onLockSwipe }) => {
     const [items, setItems] = useState<VaultItem[]>([]);
     const [refreshing, setRefreshing] = useState(false);
     const [storageInfo, setStorageInfo] = useState<{ items: number } | null>(null);
-    const [viewMode, setViewMode] = useState<'list' | 'graph'>('list');
+    const [viewMode, setViewMode] = useState<'list' | 'graph' | 'galaxy'>('list');
     const [graphData, setGraphData] = useState<{ nodes: any[], links: any[] }>({ nodes: [], links: [] });
     const [graphFilter, setGraphFilter] = useState<'all' | 'recent' | 'projects' | 'decisions'>('all');
+    const [galaxySnapshot, setGalaxySnapshot] = useState<GraphSnapshot | null>(null);
+    const [galaxyLoading, setGalaxyLoading] = useState(false);
 
     // Handle back button / cleanup
     useEffect(() => {
@@ -226,103 +230,71 @@ export const VaultScreen: React.FC<VaultScreenProps> = ({ onLockSwipe }) => {
             <View style={styles.header}>
                 <Text style={styles.glyph}>{glyphs.pattern}</Text>
                 <Text style={styles.title}>VAULT</Text>
-                <TouchableOpacity
-                    style={styles.viewToggle}
-                    onPress={async () => {
-                        HapticService.select();
-                        if (viewMode === 'list') {
-                            // Switching to graph view - load graph data
-                            console.log('[VaultScreen] Switching to graph view...');
+                <View style={styles.toggleRow}>
+                    <TouchableOpacity
+                        style={[styles.viewToggle, viewMode === 'graph' && styles.viewToggleActive]}
+                        onPress={async () => {
+                            HapticService.select();
+                            if (viewMode === 'graph') {
+                                setViewMode('list');
+                                onLockSwipe?.(false);
+                                return;
+                            }
                             setViewMode('graph');
                             onLockSwipe?.(true);
-
                             try {
-                                console.log('[VaultScreen] Has external vault?', VaultService.hasExternalVault());
                                 if (!VaultService.hasExternalVault()) {
-                                    console.log('[VaultScreen] Requesting external vault access...');
-                                    const accessGranted = await VaultService.requestExternalAccess();
-                                    console.log('[VaultScreen] Access granted?', accessGranted);
+                                    await VaultService.requestExternalAccess();
                                 }
-
-                                // Check if we can actually read files
                                 const canRead = await VaultService.checkAllFilesAccess();
-                                console.log('[VaultScreen] Can read files?', canRead);
-
                                 if (!canRead) {
-                                    // Need to manually grant "All files access" in Settings
                                     const { Linking } = require('react-native');
-                                    Alert.alert(
-                                        '⚠️ All Files Access Required',
-                                        'MirrorBrain needs special permission to read your Obsidian vault.\n\n' +
-                                        '1. Tap "Open Settings"\n' +
-                                        '2. Find "MirrorBrain" in the list\n' +
-                                        '3. Toggle ON "Allow access to manage all files"\n' +
-                                        '4. Return here and tap Graph again',
+                                    Alert.alert('All Files Access Required',
+                                        'Enable "All files access" in Settings for MirrorBrain.',
                                         [
-                                            { text: 'Cancel', style: 'cancel', onPress: () => setViewMode('list') },
-                                            {
-                                                text: 'Open Settings',
-                                                onPress: async () => {
-                                                    try {
-                                                        // Try to open the specific manage all files permission screen
-                                                        await Linking.sendIntent(
-                                                            'android.settings.MANAGE_ALL_FILES_ACCESS_PERMISSION'
-                                                        );
-                                                    } catch {
-                                                        // Fallback to general settings
-                                                        Linking.openSettings();
-                                                    }
-                                                }
-                                            }
+                                            { text: 'Cancel', style: 'cancel', onPress: () => { setViewMode('list'); onLockSwipe?.(false); } },
+                                            { text: 'Settings', onPress: () => { try { Linking.sendIntent('android.settings.MANAGE_ALL_FILES_ACCESS_PERMISSION'); } catch { Linking.openSettings(); } } }
                                         ]
                                     );
                                     return;
                                 }
-
-                                console.log('[VaultScreen] Calling getGraphData...');
                                 const gData = await VaultService.getGraphData();
-                                console.log('[VaultScreen] Graph data received:', gData.nodes.length, 'nodes,', gData.links.length, 'links');
                                 setGraphData(gData);
-
-                                if (gData.nodes.length === 0) {
-                                    console.log('[VaultScreen] Graph empty. Running diagnostics...');
-                                    const diagLogs = await VaultService.runDiagnostics();
-
-                                    Alert.alert(
-                                        'No Notes Found',
-                                        'Vault exists but appears empty. This is likely a permission issue.\n\nDebug Info:\n' + diagLogs.substring(0, 500),
-                                        [
-                                            { text: 'OK', style: 'cancel' },
-                                            {
-                                                text: 'Fix Permissions',
-                                                onPress: async () => {
-                                                    const { Linking } = require('react-native');
-                                                    try {
-                                                        await Linking.sendIntent('android.settings.MANAGE_ALL_FILES_ACCESS_PERMISSION');
-                                                    } catch {
-                                                        Linking.openSettings();
-                                                    }
-                                                }
-                                            }
-                                        ]
-                                    );
-                                }
                             } catch (error) {
                                 console.error('[VaultScreen] Error loading graph:', error);
-                                Alert.alert('Error', 'Failed to load graph data');
                                 setViewMode('list');
                                 onLockSwipe?.(false);
                             }
-                        } else {
-                            setViewMode('list');
-                            onLockSwipe?.(false);
-                        }
-                    }}
-                >
-                    <Text style={styles.viewToggleText}>
-                        {viewMode === 'list' ? '🕸️ Graph' : '📜 List'}
-                    </Text>
-                </TouchableOpacity>
+                        }}
+                    >
+                        <Text style={[styles.viewToggleText, viewMode === 'graph' && styles.viewToggleTextActive]}>Graph</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.viewToggle, viewMode === 'galaxy' && styles.viewToggleActive]}
+                        onPress={async () => {
+                            HapticService.select();
+                            if (viewMode === 'galaxy') {
+                                setViewMode('list');
+                                onLockSwipe?.(false);
+                                return;
+                            }
+                            setViewMode('galaxy');
+                            onLockSwipe?.(true);
+                            setGalaxyLoading(true);
+                            try {
+                                const snap = await graphLayoutService.fetchLayout('personal', 'all');
+                                setGalaxySnapshot(snap);
+                            } catch (err) {
+                                console.error('[VaultScreen] Galaxy load failed:', err);
+                                Alert.alert('Galaxy Error', 'Could not load graph layout from router.');
+                            } finally {
+                                setGalaxyLoading(false);
+                            }
+                        }}
+                    >
+                        <Text style={[styles.viewToggleText, viewMode === 'galaxy' && styles.viewToggleTextActive]}>Galaxy</Text>
+                    </TouchableOpacity>
+                </View>
                 {storageInfo && (
                     <Text style={styles.itemCount}>{storageInfo.items} items</Text>
                 )}
@@ -350,7 +322,7 @@ export const VaultScreen: React.FC<VaultScreenProps> = ({ onLockSwipe }) => {
                     </View>
 
                     {/* Filters */}
-                    {viewMode === 'graph' && (
+                    {(viewMode === 'graph' || viewMode === 'galaxy') && (
                         <View style={styles.filters}>
                             <FilterChip label="All" active={graphFilter === 'all'} onPress={() => setGraphFilter('all')} />
                             <FilterChip label="Last 7 days" active={graphFilter === 'recent'} onPress={() => setGraphFilter('recent')} />
@@ -455,57 +427,91 @@ export const VaultScreen: React.FC<VaultScreenProps> = ({ onLockSwipe }) => {
                         </Animated.View>
                     ) : (
                         <Animated.View entering={FadeIn} exiting={FadeOut} style={{ flex: 1 }}>
-                            <MirrorGraph
-                                data={applyGraphFilter(graphData, graphFilter)}
-                                onNodePress={async (id) => {
-                                    if (id.startsWith('dir_')) {
-                                        return; // Ignore folders for now or zoom in
-                                    }
-
-                                    console.log('[VaultScreen] Node clicked:', id);
-                                    HapticService.select();
-
-                                    // Find node to get path
-                                    const node = graphData.nodes.find(n => n.id === id);
-                                    if (node && node.path) {
-                                        try {
-                                            const content = await VaultService.readExternalFile(node.path);
-                                            if (content) {
-                                                setSelectedFile({
-                                                    title: id,
-                                                    content: content,
-                                                    path: node.path
-                                                });
-                                                setShowFileModal(true);
-                                                return;
+                            {viewMode === 'galaxy' ? (
+                                // Skia Galaxy Renderer
+                                galaxyLoading ? (
+                                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                                        <Text style={{ color: colors.textMuted, fontSize: 16 }}>Loading galaxy...</Text>
+                                    </View>
+                                ) : galaxySnapshot && galaxySnapshot.nodes.length > 0 ? (
+                                    <GraphScreen
+                                        snapshot={galaxySnapshot}
+                                        onOpenNode={async (node) => {
+                                            console.log('[VaultScreen] Galaxy node:', node.id);
+                                            HapticService.select();
+                                            if (node.path) {
+                                                try {
+                                                    const content = await VaultService.readExternalFile(node.path);
+                                                    if (content) {
+                                                        setSelectedFile({ title: node.title, content, path: node.path });
+                                                        setShowFileModal(true);
+                                                        return;
+                                                    }
+                                                } catch {
+                                                    console.warn('Failed to read galaxy node file');
+                                                }
                                             }
-                                        } catch {
-                                            console.warn('Failed to read file for preview');
+                                            const { Linking } = require('react-native');
+                                            const url = `obsidian://open?vault=MirrorDNA-Vault&file=${encodeURIComponent(node.title)}`;
+                                            try { await Linking.openURL(url); } catch { }
+                                        }}
+                                    />
+                                ) : (
+                                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                                        <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: 'center', padding: 20 }}>
+                                            No galaxy data. Run the graph builder on the Mac Mini first,{'\n'}
+                                            or check that the router is serving /graph/layout.
+                                        </Text>
+                                    </View>
+                                )
+                            ) : (
+                                // D3 Graph Renderer (existing)
+                                <MirrorGraph
+                                    data={applyGraphFilter(graphData, graphFilter)}
+                                    onNodePress={async (id) => {
+                                        if (id.startsWith('dir_')) {
+                                            return;
                                         }
-                                    }
 
-                                    // Fallback: Try Deep Link if preview fails
-                                    const { Linking } = require('react-native');
-                                    const encodedId = encodeURIComponent(id);
-                                    const url = `obsidian://open?vault=MirrorDNA-Vault&file=${encodedId}`;
-                                    try { await Linking.openURL(url); } catch { }
-                                }}
-                            />
-                            {/* Floating exit button for graph mode - prominent at top */}
+                                        console.log('[VaultScreen] Node clicked:', id);
+                                        HapticService.select();
+
+                                        const node = graphData.nodes.find(n => n.id === id);
+                                        if (node && node.path) {
+                                            try {
+                                                const content = await VaultService.readExternalFile(node.path);
+                                                if (content) {
+                                                    setSelectedFile({
+                                                        title: id,
+                                                        content: content,
+                                                        path: node.path
+                                                    });
+                                                    setShowFileModal(true);
+                                                    return;
+                                                }
+                                            } catch {
+                                                console.warn('Failed to read file for preview');
+                                            }
+                                        }
+
+                                        const { Linking } = require('react-native');
+                                        const encodedId = encodeURIComponent(id);
+                                        const url = `obsidian://open?vault=MirrorDNA-Vault&file=${encodedId}`;
+                                        try { await Linking.openURL(url); } catch { }
+                                    }}
+                                />
+                            )}
+                            {/* Floating exit pill */}
                             <TouchableOpacity
-                                style={styles.exitGraphButton}
+                                style={styles.exitPill}
                                 onPress={() => {
                                     HapticService.select();
                                     setViewMode('list');
                                     onLockSwipe?.(false);
                                 }}
                             >
-                                <Text style={styles.exitGraphText}>✕ CLOSE GRAPH</Text>
+                                <Text style={styles.exitPillText}>✕</Text>
                             </TouchableOpacity>
-                            {/* Instructions at bottom */}
-                            <View style={styles.graphInstructions}>
-                                <Text style={styles.graphInstructionsText}>Pinch to zoom • Drag to pan • Tap node to open</Text>
-                            </View>
                         </Animated.View>
                     )}
                     {/* Sync buttons */}
@@ -715,49 +721,45 @@ const styles = StyleSheet.create({
         ...typography.labelSmall,
         color: colors.textMuted,
     },
+    toggleRow: {
+        flexDirection: 'row',
+        gap: 6,
+    },
     viewToggle: {
-        paddingVertical: 8,
-        paddingHorizontal: 14,
-        borderRadius: 20,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 16,
         backgroundColor: colors.surface,
         borderWidth: 1,
         borderColor: colors.border,
     },
+    viewToggleActive: {
+        backgroundColor: colors.accentDark,
+        borderColor: colors.accentPrimary,
+    },
     viewToggleText: {
         ...typography.labelSmall,
+        color: colors.textSecondary,
+    },
+    viewToggleTextActive: {
         color: colors.textPrimary,
     },
-    exitGraphButton: {
+    exitPill: {
         position: 'absolute',
-        top: 20,
-        left: 20,
-        right: 20,
-        backgroundColor: 'rgba(255, 100, 100, 0.9)',
-        paddingVertical: 16,
-        paddingHorizontal: 24,
-        borderRadius: 12,
+        top: 12,
+        left: 12,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(30, 30, 40, 0.85)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
         alignItems: 'center',
+        justifyContent: 'center',
         zIndex: 1000,
     },
-    exitGraphText: {
-        fontSize: 18,
-        color: '#ffffff',
-        fontWeight: 'bold',
-        letterSpacing: 1,
-    },
-    graphInstructions: {
-        position: 'absolute',
-        bottom: 30,
-        left: 20,
-        right: 20,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        alignItems: 'center',
-    },
-    graphInstructionsText: {
-        fontSize: 12,
+    exitPillText: {
+        fontSize: 16,
         color: 'rgba(255, 255, 255, 0.7)',
     },
 
@@ -900,16 +902,20 @@ const styles = StyleSheet.create({
     // Sync buttons
     syncButtons: {
         flexDirection: 'row',
-        padding: spacing.md,
-        paddingTop: 0,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.sm,
         gap: spacing.sm,
+        justifyContent: 'center',
+        alignItems: 'stretch',
     },
     syncButton: {
         flex: 1,
         backgroundColor: colors.surface,
         borderRadius: 12,
-        padding: spacing.md,
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.sm,
         alignItems: 'center',
+        justifyContent: 'center',
     },
     syncIcon: {
         fontSize: 20,
@@ -918,6 +924,7 @@ const styles = StyleSheet.create({
     syncButtonText: {
         ...typography.labelSmall,
         color: colors.textSecondary,
+        textAlign: 'center',
     },
 
     // Session Modal

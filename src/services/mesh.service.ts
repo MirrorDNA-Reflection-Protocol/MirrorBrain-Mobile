@@ -71,7 +71,7 @@ type ConnectionCallback = (connected: boolean) => void;
 const RELAY_HOSTS = [
     'localhost',                    // ADB reverse (USB connected)
     '100.114.247.53',              // Tailscale IP
-    '192.168.1.100',               // Common local network IP (adjust if needed)
+    '192.168.0.112',               // LAN IP (home network)
 ];
 const DEFAULT_RELAY_PORT = 8766;
 const HEARTBEAT_INTERVAL = 8000;   // 8 seconds (aggressive)

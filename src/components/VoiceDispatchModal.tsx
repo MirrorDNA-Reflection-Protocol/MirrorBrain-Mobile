@@ -1,11 +1,10 @@
 /**
- * Voice Dispatch Modal — Record → Transcribe → Create Run
+ * Voice Dispatch Modal — Tap mic → Google Speech → Resolve Intent → Execute Tool
  *
- * UX: Tap mic → recording pulse → release → transcribe → dispatch to Router.
- * Shows last dispatch result. Supports offline queueing.
+ * UX: Tap mic → Google speech UI → transcript → resolve to tool → execute locally.
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
     View,
     Text,
@@ -14,19 +13,103 @@ import {
     TouchableOpacity,
     Animated,
     ActivityIndicator,
-    Alert,
 } from 'react-native';
-import { colors, typography, spacing, glyphs } from '../theme';
-import { GlassView } from './GlassView';
-import { RouterService, HapticService, DeviceOrchestratorService } from '../services';
-import { DeviceService } from '../services/device.service';
+import { colors, typography, spacing, borderRadius } from '../theme';
+import { HapticService } from '../services';
+import { OrchestratorService } from '../services/orchestrator.service';
+import { VoiceService } from '../services/voice.service';
 
 interface VoiceDispatchModalProps {
     visible: boolean;
     onClose: () => void;
 }
 
-type DispatchState = 'idle' | 'recording' | 'processing' | 'dispatched' | 'error';
+type DispatchState = 'idle' | 'listening' | 'processing' | 'dispatched' | 'error';
+
+/** Simple intent resolver: maps natural language to tool + params */
+function resolveIntent(text: string): { tool: string; params: Record<string, unknown> } | null {
+    const lower = text.toLowerCase().trim();
+
+    // open/launch app
+    const appMatch = lower.match(/(?:open|launch|start)\s+(.+)/);
+    if (appMatch) {
+        const appName = appMatch[1].replace(/\bapp\b/, '').trim();
+        return { tool: 'open_app', params: { app_name: appName } };
+    }
+
+    // battery
+    if (/battery|charge|power level/.test(lower)) {
+        return { tool: 'get_battery', params: {} };
+    }
+
+    // vibrate
+    if (/vibrate|buzz|haptic/.test(lower)) {
+        return { tool: 'vibrate', params: {} };
+    }
+
+    // time
+    if (/what time|current time|time is it|clock/.test(lower)) {
+        return { tool: 'get_time', params: {} };
+    }
+
+    // weather
+    if (/weather|temperature|forecast/.test(lower)) {
+        return { tool: 'get_weather', params: {} };
+    }
+
+    // clipboard
+    if (/clipboard|paste|what.*copied/.test(lower)) {
+        return { tool: 'get_clipboard', params: {} };
+    }
+
+    // storage
+    if (/storage|disk|space|memory/.test(lower)) {
+        return { tool: 'get_storage', params: {} };
+    }
+
+    // network
+    if (/network|wifi|internet|connection/.test(lower)) {
+        return { tool: 'get_network', params: {} };
+    }
+
+    // save note
+    const noteMatch = lower.match(/(?:save|write|remember|note)\s+(.+)/);
+    if (noteMatch) {
+        return { tool: 'save_note', params: { text: noteMatch[1] } };
+    }
+
+    // contacts
+    if (/contacts|people|address book/.test(lower)) {
+        return { tool: 'get_contacts', params: {} };
+    }
+
+    // calendar/schedule
+    if (/calendar|schedule|events|appointments/.test(lower)) {
+        return { tool: 'get_events', params: {} };
+    }
+
+    // notifications
+    if (/notification/.test(lower)) {
+        return { tool: 'get_notifications', params: {} };
+    }
+
+    // device info
+    if (/device info|phone info|about.*phone|system info/.test(lower)) {
+        return { tool: 'get_device_info', params: {} };
+    }
+
+    // health report
+    if (/health|status|report/.test(lower)) {
+        return { tool: 'send_health_report', params: {} };
+    }
+
+    // alert
+    if (/alert|alarm|warn/.test(lower)) {
+        return { tool: 'send_alert', params: { message: text } };
+    }
+
+    return null;
+}
 
 export const VoiceDispatchModal: React.FC<VoiceDispatchModalProps> = ({ visible, onClose }) => {
     const [state, setState] = useState<DispatchState>('idle');
@@ -50,61 +133,32 @@ export const VoiceDispatchModal: React.FC<VoiceDispatchModalProps> = ({ visible,
         pulseAnim.setValue(1);
     };
 
-    const handlePressIn = useCallback(() => {
-        HapticService.tap();
-        setState('recording');
-        setTranscript('');
-        setLastResult(null);
-        startPulse();
-    }, []);
-
-    const handlePressOut = useCallback(async () => {
-        stopPulse();
+    const executeIntent = useCallback(async (text: string) => {
+        setTranscript(text);
         setState('processing');
-        HapticService.impact();
 
-        // Simulate voice transcription
-        // In production: AudioRecord → Whisper/on-device STT → transcript
-        await new Promise(resolve => setTimeout(resolve, 1200));
+        const intent = resolveIntent(text);
+        if (!intent) {
+            HapticService.error();
+            setState('error');
+            setLastResult(`No matching command for: "${text}"`);
+            return;
+        }
 
-        const mockTranscripts = [
-            'Open Obsidian',
-            'Do not disturb on',
-            'Open Chrome',
-            'Open Settings',
-            'Do not disturb off',
-        ];
-        const simTranscript = mockTranscripts[Math.floor(Math.random() * mockTranscripts.length)];
-        setTranscript(simTranscript);
-
-        // Dispatch to Orchestrator (Ambient OS Mode C)
         try {
-            const deviceId = 'phone-local';
-            const orchResult = await DeviceOrchestratorService.dispatch(
-                simTranscript,
-                deviceId,
-            );
+            const result = await OrchestratorService.executeTool(intent.tool, intent.params);
 
-            // Also audit the dispatch via Router
-            await RouterService.auditAppend('voice_dispatch', {
-                transcript: simTranscript,
-                dispatched: orchResult.ok,
-                queued: orchResult.queued || false,
-                run_id: orchResult.run?.run_id,
-                skill_id: orchResult.run?.skill_id,
-                status: orchResult.run?.status,
-            });
-
-            if (orchResult.ok && orchResult.run) {
+            if (result.success) {
                 HapticService.success();
                 setState('dispatched');
-                setLastResult(`${orchResult.run.skill_id}: ${JSON.stringify(orchResult.run.args)}`);
-            } else if (orchResult.queued) {
-                HapticService.select();
-                setState('dispatched');
-                setLastResult(`Queued (offline): "${simTranscript}"`);
+                const display = result.formatted
+                    ? result.formatted
+                    : result.data
+                        ? JSON.stringify(result.data)
+                        : `${intent.tool}: done`;
+                setLastResult(display);
             } else {
-                throw new Error(orchResult.error || orchResult.run?.error || 'dispatch failed');
+                throw new Error(result.error || 'execution failed');
             }
         } catch (err: any) {
             HapticService.error();
@@ -112,6 +166,37 @@ export const VoiceDispatchModal: React.FC<VoiceDispatchModalProps> = ({ visible,
             setLastResult(`Error: ${err?.message || 'unknown'}`);
         }
     }, []);
+
+    const handleMicTap = useCallback(async () => {
+        HapticService.tap();
+        setState('listening');
+        setTranscript('');
+        setLastResult(null);
+        startPulse();
+
+        const started = await VoiceService.startListening((text, isFinal) => {
+            if (isFinal) {
+                stopPulse();
+                executeIntent(text);
+            } else {
+                setTranscript(text);
+            }
+        });
+
+        if (!started) {
+            stopPulse();
+            const err = VoiceService.getLastError();
+            setState('error');
+            setLastResult(`Voice error: ${err || 'Could not start speech recognition'}`);
+            HapticService.error();
+        }
+    }, [executeIntent]);
+
+    useEffect(() => {
+        if (state !== 'listening') {
+            stopPulse();
+        }
+    }, [state]);
 
     const handleClose = () => {
         setState('idle');
@@ -122,16 +207,16 @@ export const VoiceDispatchModal: React.FC<VoiceDispatchModalProps> = ({ visible,
     };
 
     const stateLabel = {
-        idle: 'Hold to Record',
-        recording: 'Recording...',
+        idle: 'Tap to Speak',
+        listening: 'Listening...',
         processing: 'Processing...',
-        dispatched: 'Dispatched',
+        dispatched: 'Done',
         error: 'Failed',
     };
 
     const stateColor = {
         idle: colors.textMuted,
-        recording: colors.error,
+        listening: colors.accentPrimary,
         processing: colors.accentPrimary,
         dispatched: colors.success,
         error: colors.error,
@@ -140,10 +225,10 @@ export const VoiceDispatchModal: React.FC<VoiceDispatchModalProps> = ({ visible,
     return (
         <Modal visible={visible} animationType="fade" transparent>
             <View style={styles.overlay}>
-                <GlassView style={styles.card} variant="prominent">
+                <View style={styles.card}>
                     <Text style={styles.title}>Voice Dispatch</Text>
                     <Text style={styles.subtitle}>
-                        Hold the mic to record a command. Release to transcribe and dispatch.
+                        Tap the mic and say a command like "open Chrome", "battery", "what time is it", or "check weather".
                     </Text>
 
                     {/* Mic Button */}
@@ -151,16 +236,15 @@ export const VoiceDispatchModal: React.FC<VoiceDispatchModalProps> = ({ visible,
                         <Animated.View style={[styles.pulseRing, { transform: [{ scale: pulseAnim }], borderColor: stateColor[state] }]} />
                         <TouchableOpacity
                             style={[styles.micBtn, { borderColor: stateColor[state] }]}
-                            onPressIn={handlePressIn}
-                            onPressOut={handlePressOut}
-                            disabled={state === 'processing'}
+                            onPress={handleMicTap}
+                            disabled={state === 'processing' || state === 'listening'}
                             activeOpacity={0.8}
                         >
                             {state === 'processing' ? (
                                 <ActivityIndicator color={colors.accentPrimary} size="large" />
                             ) : (
                                 <Text style={styles.micIcon}>
-                                    {state === 'dispatched' ? '✓' : state === 'error' ? '✗' : '🎙'}
+                                    {state === 'dispatched' ? '\u2713' : state === 'error' ? '\u2717' : '\uD83C\uDF99'}
                                 </Text>
                             )}
                         </TouchableOpacity>
@@ -172,30 +256,26 @@ export const VoiceDispatchModal: React.FC<VoiceDispatchModalProps> = ({ visible,
 
                     {/* Transcript */}
                     {transcript !== '' && (
-                        <GlassView style={styles.transcriptCard} variant="subtle">
+                        <View style={styles.transcriptCard}>
                             <Text style={styles.transcriptLabel}>Transcript</Text>
                             <Text style={styles.transcriptText}>{transcript}</Text>
-                        </GlassView>
+                        </View>
                     )}
 
                     {/* Last Result */}
                     {lastResult && (
-                        <Text style={[styles.resultText, { color: state === 'error' ? colors.error : colors.success }]}>
-                            {lastResult}
-                        </Text>
-                    )}
-
-                    {/* Queue indicator */}
-                    {RouterService.getQueueSize() > 0 && (
-                        <Text style={styles.queueText}>
-                            {RouterService.getQueueSize()} requests queued
-                        </Text>
+                        <View style={styles.resultCard}>
+                            <Text style={styles.resultLabel}>{state === 'error' ? 'Error' : 'Result'}</Text>
+                            <Text style={[styles.resultText, { color: state === 'error' ? colors.error : colors.success }]}>
+                                {lastResult}
+                            </Text>
+                        </View>
                     )}
 
                     <TouchableOpacity style={styles.closeBtn} onPress={handleClose}>
                         <Text style={styles.closeText}>Close</Text>
                     </TouchableOpacity>
-                </GlassView>
+                </View>
             </View>
         </Modal>
     );
@@ -203,7 +283,14 @@ export const VoiceDispatchModal: React.FC<VoiceDispatchModalProps> = ({ visible,
 
 const styles = StyleSheet.create({
     overlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', padding: spacing.lg },
-    card: { padding: spacing.lg, alignItems: 'center' },
+    card: {
+        padding: spacing.lg,
+        alignItems: 'center',
+        backgroundColor: 'rgba(30, 35, 55, 0.95)',
+        borderRadius: borderRadius.xl,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+    },
     title: { ...typography.headlineMedium, color: colors.textPrimary, marginBottom: spacing.xs },
     subtitle: { ...typography.bodySmall, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.lg },
 
@@ -229,12 +316,29 @@ const styles = StyleSheet.create({
 
     stateText: { ...typography.labelMedium, marginBottom: spacing.md },
 
-    transcriptCard: { padding: spacing.md, width: '100%', marginBottom: spacing.sm },
+    transcriptCard: {
+        padding: spacing.md,
+        width: '100%',
+        marginBottom: spacing.sm,
+        backgroundColor: 'rgba(15, 20, 35, 0.75)',
+        borderRadius: borderRadius.md,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+    },
     transcriptLabel: { ...typography.labelSmall, color: colors.textMuted, marginBottom: spacing.xs },
     transcriptText: { ...typography.bodyMedium, color: colors.textPrimary },
 
-    resultText: { ...typography.bodySmall, textAlign: 'center', marginBottom: spacing.sm },
-    queueText: { ...typography.labelSmall, color: colors.warning, marginBottom: spacing.sm },
+    resultCard: {
+        padding: spacing.md,
+        width: '100%',
+        marginBottom: spacing.sm,
+        backgroundColor: 'rgba(15, 20, 35, 0.75)',
+        borderRadius: borderRadius.md,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    resultLabel: { ...typography.labelSmall, color: colors.textMuted, marginBottom: spacing.xs },
+    resultText: { ...typography.bodyMedium },
 
     closeBtn: { marginTop: spacing.sm, padding: spacing.sm },
     closeText: { ...typography.bodyMedium, color: colors.textMuted },

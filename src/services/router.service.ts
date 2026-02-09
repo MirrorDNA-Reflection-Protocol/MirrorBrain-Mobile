@@ -10,8 +10,8 @@
 import RNFS from 'react-native-fs';
 import { STORAGE_PATHS } from './vault.service';
 
-const ROUTER_URL = 'http://10.0.2.2:8097'; // Android emulator → host localhost
-const ROUTER_URL_DEVICE = 'http://192.168.1.100:8097'; // LAN fallback (configure per network)
+const ROUTER_URL = 'http://100.114.247.53:8097'; // Tailscale — reachable from anywhere
+const ROUTER_URL_DEVICE = 'http://192.168.0.112:8097'; // LAN fallback (configure per network)
 const QUEUE_FILE = `${RNFS.DocumentDirectoryPath}/MirrorBrain/router_queue.json`;
 const TIMEOUT_MS = 10000;
 

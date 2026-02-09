@@ -17,6 +17,9 @@ import com.mirrorbrainmobile.automation.AutomationPackage
 import com.mirrorbrainmobile.location.LocationPackage
 import com.mirrorbrainmobile.focus.FocusPackage
 import com.mirrorbrainmobile.speech.SpeechPackage
+import com.mirrorbrainmobile.assistant.AssistantPackage
+import com.mirrorbrainmobile.share.SharePackage
+import com.mirrorbrainmobile.vision.VisionPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -45,6 +48,12 @@ class MainApplication : Application(), ReactApplication {
           add(FocusPackage())
           // Speech: Native speech recognition
           add(SpeechPackage())
+          // Assistant: Voice interaction, wake word, double-tap
+          add(AssistantPackage())
+          // Share: Receive shared content from other apps
+          add(SharePackage())
+          // Vision: Camera-based AI queries
+          add(VisionPackage())
         },
     )
   }
