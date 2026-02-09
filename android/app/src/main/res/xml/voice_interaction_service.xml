@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    MirrorBrain Voice Interaction Service Configuration
+
+    This allows MirrorBrain to act as the device's digital assistant,
+    replacing Google Assistant when triggered via:
+    - Long-press home button
+    - Corner swipe gestures
+    - Assistant hardware key (if present)
+-->
+<voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:sessionService="com.mirrorbrainmobile.assistant.MirrorSessionService"
+    android:recognitionService="com.mirrorbrainmobile.assistant.MirrorSessionService"
+    android:supportsAssist="true"
+    android:supportsLaunchVoiceAssistFromKeyguard="true"
+    android:supportsLocalInteraction="true" />
