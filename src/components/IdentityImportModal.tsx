@@ -19,8 +19,11 @@ import {
     Alert,
     ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, typography, spacing, glyphs } from '../theme';
 import { IdentityService } from '../services';
+
+const SKIP_SEED_KEY = '@mirrorBrain:skipSeed';
 
 interface IdentityImportModalProps {
     visible: boolean;
@@ -68,7 +71,12 @@ export const IdentityImportModal: React.FC<IdentityImportModalProps> = ({
         Linking.openURL(IdentityService.getCreateIdentityUrl());
     };
 
-    const handleSkip = () => {
+    const handleSkip = async () => {
+        try {
+            await AsyncStorage.setItem(SKIP_SEED_KEY, 'true');
+        } catch (e) {
+            console.warn('[IdentityImportModal] Failed to persist skip preference:', e);
+        }
         onClose();
     };
 
@@ -178,6 +186,16 @@ export const IdentityImportModal: React.FC<IdentityImportModalProps> = ({
         </Modal>
     );
 };
+
+/** Check if user previously skipped the seed import */
+export async function hasSeedBeenSkipped(): Promise<boolean> {
+    try {
+        const value = await AsyncStorage.getItem(SKIP_SEED_KEY);
+        return value === 'true';
+    } catch {
+        return false;
+    }
+}
 
 const styles = StyleSheet.create({
     overlay: {

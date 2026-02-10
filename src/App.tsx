@@ -18,7 +18,7 @@ import {
     Platform,
 } from 'react-native';
 import { PulseScreen, NowScreen, AskScreen, VaultScreen, ActionsScreen } from './screens';
-import { IdentityImportModal } from './components';
+import { IdentityImportModal, hasSeedBeenSkipped } from './components';
 import {
     VaultService,
     IdentityService,
@@ -71,7 +71,10 @@ export const App: React.FC = () => {
             }
 
             if (!hasIdentity) {
-                setTimeout(() => setShowIdentityModal(true), 1000);
+                const skipped = await hasSeedBeenSkipped();
+                if (!skipped) {
+                    setTimeout(() => setShowIdentityModal(true), 1000);
+                }
             }
         } catch (error) {
             console.error('Failed to initialize app:', error);
