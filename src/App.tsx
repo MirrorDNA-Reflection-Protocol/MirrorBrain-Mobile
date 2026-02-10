@@ -9,13 +9,13 @@ import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
     View,
     StyleSheet,
-    Dimensions,
     ScrollView,
     StatusBar,
     TouchableOpacity,
     NativeSyntheticEvent,
     NativeScrollEvent,
     Platform,
+    useWindowDimensions,
 } from 'react-native';
 import { PulseScreen, NowScreen, AskScreen, VaultScreen, ActionsScreen } from './screens';
 import { IdentityImportModal, hasSeedBeenSkipped } from './components';
@@ -26,11 +26,13 @@ import {
     PassiveIntelligenceService,
     MobileBusService,
     MeshService,
+    OverlayService,
+    GestureService,
+    HapticService,
 } from './services';
 import { colors, spacing } from './theme';
+import { moderateScale } from './theme/responsive';
 import type { PanelName } from './types';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface Panel {
     key: PanelName;
@@ -38,6 +40,7 @@ interface Panel {
 }
 
 export const App: React.FC = () => {
+    const { width: screenWidth } = useWindowDimensions();
     const scrollViewRef = useRef<ScrollView>(null);
     const [currentPanel, setCurrentPanel] = useState<PanelName>('PULSE');
     const [isOnline, setIsOnline] = useState(false);
@@ -68,6 +71,40 @@ export const App: React.FC = () => {
                 console.log('[App] Mesh service connected');
             } catch (meshError) {
                 console.warn('[App] Mesh service failed to connect:', meshError);
+            }
+
+            // Start floating overlay bubble (if permission granted)
+            try {
+                const hasOverlayPerm = await OverlayService.hasPermission();
+                if (hasOverlayPerm) {
+                    await OverlayService.start();
+                    OverlayService.onQuery((event) => {
+                        // Navigate to ASK panel when user queries from overlay
+                        scrollViewRef.current?.scrollTo({ x: 2 * screenWidth, animated: true });
+                        setCurrentPanel('ASK');
+                        console.log('[App] Overlay query:', event.query);
+                    });
+                    console.log('[App] Overlay bubble started');
+                }
+            } catch (overlayError) {
+                console.warn('[App] Overlay service failed:', overlayError);
+            }
+
+            // Start shake gesture detection
+            try {
+                await GestureService.start();
+                GestureService.onGesture((event) => {
+                    if (event.type === 'shake') {
+                        HapticService.impact();
+                        // Shake → jump to ASK panel
+                        scrollViewRef.current?.scrollTo({ x: 2 * screenWidth, animated: true });
+                        setCurrentPanel('ASK');
+                        console.log('[App] Shake detected, navigating to ASK');
+                    }
+                });
+                console.log('[App] Gesture service started');
+            } catch (gestureError) {
+                console.warn('[App] Gesture service failed:', gestureError);
             }
 
             if (!hasIdentity) {
@@ -109,16 +146,24 @@ export const App: React.FC = () => {
     const handleScrollEnd = useCallback(
         (event: NativeSyntheticEvent<NativeScrollEvent>) => {
             const offsetX = event.nativeEvent.contentOffset.x;
-            const index = Math.round(offsetX / SCREEN_WIDTH);
+            const index = Math.round(offsetX / screenWidth);
             if (index >= 0 && index < panels.length) {
                 setCurrentPanel(panels[index].key);
+                // Exit graph mode when swiping away from VAULT
+                if (panels[index].key !== 'VAULT' && isGraphActive) {
+                    setIsGraphActive(false);
+                }
             }
         },
-        [panels]
+        [panels, isGraphActive]
     );
 
     const scrollToPanel = (index: number) => {
-        scrollViewRef.current?.scrollTo({ x: index * SCREEN_WIDTH, animated: true });
+        // Exit graph mode when navigating away from VAULT via dots
+        if (isGraphActive && panels[index].key !== 'VAULT') {
+            setIsGraphActive(false);
+        }
+        scrollViewRef.current?.scrollTo({ x: index * screenWidth, animated: true });
     };
 
     const currentIndex = panels.findIndex(p => p.key === currentPanel);
@@ -141,14 +186,14 @@ export const App: React.FC = () => {
                         ref={scrollViewRef}
                         horizontal
                         pagingEnabled
-                        scrollEnabled={currentPanel !== 'VAULT' || !isGraphActive}
                         showsHorizontalScrollIndicator={false}
                         bounces={false}
                         onMomentumScrollEnd={handleScrollEnd}
                         scrollEventThrottle={16}
+                        nestedScrollEnabled={true}
                     >
                         {panels.map((panel) => (
-                            <View key={panel.key} style={{ width: SCREEN_WIDTH, height: panelHeight }}>
+                            <View key={panel.key} style={{ width: screenWidth, height: panelHeight }}>
                                 {panel.component}
                             </View>
                         ))}
@@ -201,31 +246,31 @@ const styles = StyleSheet.create({
     // Ultra-minimal navigation
     navContainer: {
         backgroundColor: '#000000',
-        paddingBottom: 28, // Clear of gesture bar
-        paddingTop: 12,
+        paddingBottom: moderateScale(28),
+        paddingTop: moderateScale(12),
     },
     dotsRow: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: 12,
+        gap: moderateScale(12),
     },
     dotTouch: {
-        padding: 8,
+        padding: moderateScale(8),
     },
     dot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
+        width: moderateScale(6),
+        height: moderateScale(6),
+        borderRadius: moderateScale(3),
         backgroundColor: colors.textMuted,
         opacity: 0.4,
     },
     dotActive: {
         backgroundColor: '#f59e0b', // Amber from branding
         opacity: 1,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+        width: moderateScale(8),
+        height: moderateScale(8),
+        borderRadius: moderateScale(4),
     },
 });
 

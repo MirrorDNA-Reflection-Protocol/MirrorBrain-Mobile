@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
 import { GlassView } from '../components';
-import { RouterService, HapticService } from '../services';
+import { RouterService, HapticService, DeviceOrchestratorService } from '../services';
 
 interface RunsFeedScreenProps {
     onClose: () => void;
@@ -73,14 +73,34 @@ export const RunsFeedScreen: React.FC<RunsFeedScreenProps> = ({ onClose }) => {
 
     const loadRuns = async () => {
         try {
-            const res = await RouterService.getAnalytics();
-            // Load runs from audit log as a proxy
-            const auditRes = await RouterService.auditAppend('runs_feed_viewed', {});
-            // For now, show analytics-derived data
-            // In production, we'd have a /runs/list endpoint
-            setRuns([]);
+            // Pull from device orchestrator (real runs) + router analytics
+            const [orchRuns, analyticsRes] = await Promise.all([
+                DeviceOrchestratorService.getRecentRuns(20),
+                RouterService.getAnalytics(),
+            ]);
+
+            // Map orchestrator RunRecords to RunItem display format
+            const items: RunItem[] = orchRuns.map(r => ({
+                run_id: r.run_id,
+                project: r.skill_id || 'device',
+                state: r.status === 'dispatched' ? 'active' : r.status,
+                created_at: r.requested_at,
+                skills_used: [r.skill_id].filter(Boolean),
+                error: r.error,
+            }));
+
+            setRuns(items);
         } catch {
-            // Offline
+            // Offline — show local cache
+            const localRuns = DeviceOrchestratorService.getLocalRuns();
+            setRuns(localRuns.map(r => ({
+                run_id: r.run_id,
+                project: r.skill_id || 'device',
+                state: r.status === 'dispatched' ? 'active' : r.status,
+                created_at: r.requested_at,
+                skills_used: [r.skill_id].filter(Boolean),
+                error: r.error,
+            })));
         } finally {
             setLoading(false);
         }

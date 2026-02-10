@@ -24,8 +24,9 @@ import {
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
 import { GlassView } from '../components';
-import { RouterService, HapticService, DeviceOrchestratorService } from '../services';
+import { RouterService, HapticService, DeviceOrchestratorService, PassiveIntelligenceService } from '../services';
 import type { RunRecord } from '../services/device_orchestrator.service';
+import type { ClipboardCapture, NotificationData } from '../services/passive.service';
 import { RunsFeedScreen } from './RunsFeedScreen';
 import { TrustPanelScreen } from './TrustPanelScreen';
 import { VoiceDispatchModal } from '../components/VoiceDispatchModal';
@@ -56,6 +57,8 @@ export const PulseScreen: React.FC = () => {
     const [deviceRuns, setDeviceRuns] = useState<RunRecord[]>([]);
     const [orchOnline, setOrchOnline] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
+    const [recentClips, setRecentClips] = useState<ClipboardCapture[]>([]);
+    const [recentNotifs, setRecentNotifs] = useState<NotificationData[]>([]);
 
     useEffect(() => {
         const interval = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -64,6 +67,22 @@ export const PulseScreen: React.FC = () => {
 
     useEffect(() => {
         loadData();
+
+        // Subscribe to clipboard captures
+        const unsubClip = PassiveIntelligenceService.clipboard.start({
+            onCapture: (capture) => {
+                setRecentClips(prev => [capture, ...prev].slice(0, 5));
+            },
+        });
+
+        // Load active notifications
+        PassiveIntelligenceService.notifications.getActive()
+            .then(notifs => setRecentNotifs(notifs.slice(0, 5)))
+            .catch(() => {});
+
+        return () => {
+            // Cleanup handled by service singleton
+        };
     }, []);
 
     const loadData = async () => {
@@ -204,6 +223,33 @@ export const PulseScreen: React.FC = () => {
                     )}
                 </GlassView>
 
+                {/* Context Feed — PassiveIntelligence */}
+                {(recentClips.length > 0 || recentNotifs.length > 0) && (
+                    <GlassView style={styles.contextCard} variant="subtle">
+                        <Text style={styles.sectionTitle}>{glyphs.pattern} Context Feed</Text>
+                        {recentClips.map((clip, i) => (
+                            <View key={`clip-${i}`} style={styles.contextRow}>
+                                <Text style={styles.contextIcon}>
+                                    {clip.type === 'url' ? '🔗' : clip.type === 'phone' ? '📞' : clip.type === 'email' ? '📧' : '📋'}
+                                </Text>
+                                <Text style={styles.contextText} numberOfLines={1}>
+                                    {clip.text}
+                                </Text>
+                                <Text style={styles.contextType}>{clip.type}</Text>
+                            </View>
+                        ))}
+                        {recentNotifs.map((notif, i) => (
+                            <View key={`notif-${i}`} style={styles.contextRow}>
+                                <Text style={styles.contextIcon}>🔔</Text>
+                                <Text style={styles.contextText} numberOfLines={1}>
+                                    {notif.title || notif.appName}: {notif.text}
+                                </Text>
+                                <Text style={styles.contextType}>{notif.appName}</Text>
+                            </View>
+                        ))}
+                    </GlassView>
+                )}
+
                 {/* Quick Actions */}
                 <Text style={styles.sectionHeader}>Quick Actions</Text>
                 <View style={styles.actionsRow}>
@@ -315,4 +361,10 @@ const styles = StyleSheet.create({
 
     queueCard: { padding: spacing.sm },
     queueText: { ...typography.bodySmall, color: colors.warning, textAlign: 'center' },
+
+    contextCard: { padding: spacing.md, marginBottom: spacing.md },
+    contextRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 3, gap: spacing.xs },
+    contextIcon: { fontSize: 14, width: 20 },
+    contextText: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 },
+    contextType: { ...typography.labelSmall, color: colors.textMuted, width: 50, textAlign: 'right' },
 });

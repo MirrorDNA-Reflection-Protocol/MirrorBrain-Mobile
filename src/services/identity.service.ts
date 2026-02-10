@@ -10,9 +10,9 @@ import RNFS from 'react-native-fs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_PATHS } from './vault.service';
 
-// MirrorBrain server endpoint (Mac Mini)
-// TODO: Make this configurable via settings
-const MIRRORBRAIN_HOST = 'http://192.168.1.100:8083'; // Update with actual IP
+// MirrorBrain server endpoint — configurable via AsyncStorage
+const DEFAULT_HOST = 'http://192.168.1.100:8083';
+const HOST_STORAGE_KEY = '@mirrorbrain/host';
 
 const IDENTITY_CACHE_KEY = '@mirrorbrain/identity';
 const IDENTITY_FILE = 'Config/identity.json';
@@ -51,12 +51,17 @@ export interface MirrorSeed {
 class IdentityServiceClass {
     private kernel: IdentityKernel | null = null;
     private isLoading: boolean = false;
+    private hostOverride: string | null = null;
 
     /**
      * Initialize identity service — try to load cached identity
      */
     async initialize(): Promise<boolean> {
         try {
+            // Load saved host override
+            const savedHost = await AsyncStorage.getItem(HOST_STORAGE_KEY);
+            if (savedHost) this.hostOverride = savedHost;
+
             const cached = await this.loadFromCache();
             if (cached) {
                 this.kernel = cached;
@@ -71,13 +76,29 @@ class IdentityServiceClass {
     }
 
     /**
+     * Get the configured server host
+     */
+    getHost(): string {
+        return this.hostOverride || DEFAULT_HOST;
+    }
+
+    /**
+     * Set the MirrorBrain server host (persisted to AsyncStorage)
+     */
+    async setHost(host: string): Promise<void> {
+        this.hostOverride = host;
+        await AsyncStorage.setItem(HOST_STORAGE_KEY, host);
+        console.log('Identity server host set to:', host);
+    }
+
+    /**
      * Fetch identity from MirrorBrain server
      */
     async fetchFromServer(host?: string): Promise<boolean> {
         if (this.isLoading) return false;
         this.isLoading = true;
 
-        const serverHost = host || MIRRORBRAIN_HOST;
+        const serverHost = host || this.getHost();
 
         try {
             // Fetch identity kernel from MirrorBrain MCP

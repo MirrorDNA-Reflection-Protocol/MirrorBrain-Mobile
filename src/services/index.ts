@@ -207,6 +207,12 @@ export {
     type WeeklyStats,
 } from './digest.service';
 
+// Gesture Service — Shake Detection
+export {
+    GestureService,
+    type GestureEvent,
+} from './gesture.service';
+
 // Mesh Service — Agent Communication Network
 export {
     MeshService,

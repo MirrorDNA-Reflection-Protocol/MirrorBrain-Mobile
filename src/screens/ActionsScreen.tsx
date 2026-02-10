@@ -20,7 +20,7 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
-import { VaultService, CalendarService, VoiceService, FocusService, RouterService, type CalendarEvent } from '../services';
+import { VaultService, CalendarService, VoiceService, FocusService, RouterService, DeviceOrchestratorService, HapticService, type CalendarEvent } from '../services';
 import { BriefingScreen } from './BriefingScreen';
 import { RelationshipsScreen } from './RelationshipsScreen';
 import { DigestScreen } from './DigestScreen';
@@ -98,6 +98,13 @@ const actions: Action[] = [
         description: 'Open maps with context',
         available: true,
     },
+    {
+        id: 'device-command',
+        icon: '⚡',
+        label: 'Device Command',
+        description: 'Send intent to orchestrator',
+        available: true,
+    },
 ];
 
 interface ActionsScreenProps {
@@ -128,6 +135,11 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
     const [focusModalVisible, setFocusModalVisible] = useState(false);
     const [focusActive, setFocusActive] = useState(false);
     const [focusLoading, setFocusLoading] = useState(false);
+
+    // Device command state
+    const [deviceModalVisible, setDeviceModalVisible] = useState(false);
+    const [deviceIntent, setDeviceIntent] = useState('');
+    const [deviceSending, setDeviceSending] = useState(false);
 
 
 
@@ -165,6 +177,9 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
             case 'navigation':
                 handleNavigation();
                 break;
+            case 'device-command':
+                setDeviceModalVisible(true);
+                break;
         }
     };
 
@@ -197,6 +212,37 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
             Alert.alert('Error', 'Failed to toggle focus mode');
         } finally {
             setFocusLoading(false);
+        }
+    };
+
+    const handleDeviceCommand = async () => {
+        if (!deviceIntent.trim()) return;
+        setDeviceSending(true);
+        HapticService.tap();
+
+        try {
+            const result = await DeviceOrchestratorService.dispatch(
+                deviceIntent.trim(),
+                'oneplus-3C15AT00EBJ',
+            );
+
+            if (result.ok) {
+                HapticService.success();
+                Alert.alert('Dispatched', `Run ${result.run?.run_id?.slice(0, 8)} → ${result.run?.status}`);
+            } else if (result.queued) {
+                HapticService.select();
+                Alert.alert('Queued', 'Device offline — will dispatch when connected');
+            } else {
+                HapticService.error();
+                Alert.alert('Failed', result.error || 'Unknown error');
+            }
+            setDeviceIntent('');
+            setDeviceModalVisible(false);
+        } catch (error) {
+            HapticService.error();
+            Alert.alert('Error', 'Failed to dispatch command');
+        } finally {
+            setDeviceSending(false);
         }
     };
 
@@ -516,6 +562,54 @@ export const ActionsScreen: React.FC<ActionsScreenProps> = () => {
                 </View>
             </Modal>
 
+            {/* Device Command modal */}
+            <Modal
+                visible={deviceModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setDeviceModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Device Command</Text>
+                            <TouchableOpacity
+                                onPress={() => setDeviceModalVisible(false)}
+                                style={styles.closeButton}
+                            >
+                                <Text style={styles.closeButtonText}>✕</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.deviceHint}>
+                            Send an intent to the device orchestrator (Tasker/AutoInput)
+                        </Text>
+
+                        <TextInput
+                            style={styles.titleInput}
+                            placeholder="e.g. open_obsidian, send_whatsapp, toggle_flashlight"
+                            placeholderTextColor={colors.textMuted}
+                            value={deviceIntent}
+                            onChangeText={setDeviceIntent}
+                            autoFocus
+                        />
+
+                        <TouchableOpacity
+                            style={[
+                                styles.saveButton,
+                                (!deviceIntent.trim() || deviceSending) && styles.saveButtonDisabled
+                            ]}
+                            onPress={handleDeviceCommand}
+                            disabled={!deviceIntent.trim() || deviceSending}
+                        >
+                            <Text style={styles.saveButtonText}>
+                                {deviceSending ? 'Dispatching...' : 'Dispatch'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
             {/* Briefing Screen modal */}
             <Modal
                 visible={briefingVisible}
@@ -809,6 +903,13 @@ const styles = StyleSheet.create({
         ...typography.bodySmall,
         color: colors.textMuted,
         marginTop: spacing.xs,
+    },
+
+    // Device command
+    deviceHint: {
+        ...typography.bodySmall,
+        color: colors.textMuted,
+        marginBottom: spacing.md,
     },
 
     // Focus mode

@@ -5,7 +5,8 @@
  * Typography-forward — Inter or system font, clear hierarchy
  */
 
-import { Platform, TextStyle } from 'react-native';
+import { Platform, TextStyle, PixelRatio } from 'react-native';
+import { fontScale } from './responsive';
 
 // Use Inter on Android (downloadable), SF Pro on iOS (system)
 const fontFamily = Platform.select({
@@ -14,98 +15,101 @@ const fontFamily = Platform.select({
     default: 'System',
 });
 
+// Prevent system font scaling from blowing up layout.
+// We handle scaling ourselves via fontScale() which caps at 1.3x.
+// Set allowFontScaling=false on Text components OR use these pre-scaled values.
 export const typography = {
     // Display - for large headers
     displayLarge: {
         fontFamily,
-        fontSize: 32,
+        fontSize: fontScale(32),
         fontWeight: '700',
-        lineHeight: 40,
+        lineHeight: fontScale(40),
         letterSpacing: -0.5,
     } as TextStyle,
 
     displayMedium: {
         fontFamily,
-        fontSize: 28,
+        fontSize: fontScale(28),
         fontWeight: '600',
-        lineHeight: 36,
+        lineHeight: fontScale(36),
         letterSpacing: -0.25,
     } as TextStyle,
 
     displaySmall: {
         fontFamily,
-        fontSize: 24,
+        fontSize: fontScale(24),
         fontWeight: '600',
-        lineHeight: 32,
+        lineHeight: fontScale(32),
         letterSpacing: 0,
     } as TextStyle,
 
     // Headlines
     headlineLarge: {
         fontFamily,
-        fontSize: 24,
+        fontSize: fontScale(24),
         fontWeight: '600',
-        lineHeight: 32,
+        lineHeight: fontScale(32),
     } as TextStyle,
 
     headlineMedium: {
         fontFamily,
-        fontSize: 20,
+        fontSize: fontScale(20),
         fontWeight: '600',
-        lineHeight: 28,
+        lineHeight: fontScale(28),
     } as TextStyle,
 
     headlineSmall: {
         fontFamily,
-        fontSize: 18,
+        fontSize: fontScale(18),
         fontWeight: '500',
-        lineHeight: 24,
+        lineHeight: fontScale(24),
     } as TextStyle,
 
     // Body
     bodyLarge: {
         fontFamily,
-        fontSize: 16,
+        fontSize: fontScale(16),
         fontWeight: '400',
-        lineHeight: 24,
+        lineHeight: fontScale(24),
     } as TextStyle,
 
     bodyMedium: {
         fontFamily,
-        fontSize: 14,
+        fontSize: fontScale(14),
         fontWeight: '400',
-        lineHeight: 20,
+        lineHeight: fontScale(20),
     } as TextStyle,
 
     bodySmall: {
         fontFamily,
-        fontSize: 12,
+        fontSize: fontScale(12),
         fontWeight: '400',
-        lineHeight: 16,
+        lineHeight: fontScale(16),
     } as TextStyle,
 
     // Labels
     labelLarge: {
         fontFamily,
-        fontSize: 14,
+        fontSize: fontScale(14),
         fontWeight: '500',
-        lineHeight: 20,
+        lineHeight: fontScale(20),
         letterSpacing: 0.1,
     } as TextStyle,
 
     labelMedium: {
         fontFamily,
-        fontSize: 12,
+        fontSize: fontScale(12),
         fontWeight: '500',
-        lineHeight: 16,
+        lineHeight: fontScale(16),
         letterSpacing: 0.5,
     } as TextStyle,
 
     labelSmall: {
         fontFamily,
-        fontSize: 11,
+        fontSize: fontScale(11),
         fontWeight: '500',
-        lineHeight: 16,
+        lineHeight: fontScale(16),
         letterSpacing: 0.5,
     } as TextStyle,
 
@@ -116,9 +120,9 @@ export const typography = {
             android: 'monospace',
             default: 'monospace',
         }),
-        fontSize: 14,
+        fontSize: fontScale(14),
         fontWeight: '400',
-        lineHeight: 20,
+        lineHeight: fontScale(20),
     } as TextStyle,
 } as const;
 
