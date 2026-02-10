@@ -52,5 +52,8 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "overrides": {
+    "xmldom": "npm:@xmldom/xmldom@^0.8.10"
   }
 }
