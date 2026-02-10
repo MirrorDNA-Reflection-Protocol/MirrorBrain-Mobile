@@ -1,14 +1,18 @@
 /**
  * Device Orchestrator Client — Ambient OS (Mode C)
  *
- * Dispatches intents to the mirrordna-orchestrator service (port 8098).
+ * Dispatches intents to Tasker HTTP Server (port 8081) or Mac orchestrator (port 8098).
  * Handles: intent dispatch, run tracking, device status, offline queue.
  *
- * Flow: Voice/PULSE → intent → orchestrator → policy gate → device command → Tasker
+ * Flow: App → Tasker HTTP (localhost:8081) → device command
+ *       App → Mac Orchestrator (8098) → policy gate → Tasker (8081) → device command
  */
 
 import RNFS from 'react-native-fs';
 
+// Tasker HTTP Server — runs on same phone (fastest path)
+const TASKER_LOCAL = 'http://localhost:8081';
+// Mac orchestrator — policy gate (fallback)
 const ORCH_URL_TAILSCALE = 'http://100.114.247.53:8098';
 const ORCH_URL_LAN = 'http://192.168.0.112:8098';
 const ORCH_QUEUE_FILE = `${RNFS.DocumentDirectoryPath}/MirrorBrain/orch_queue.json`;
@@ -65,7 +69,8 @@ interface QueuedIntent {
 }
 
 class DeviceOrchestratorServiceClass {
-    private baseUrl: string = ORCH_URL_TAILSCALE;
+    private baseUrl: string = TASKER_LOCAL;
+    private isTaskerDirect: boolean = false;
     private online: boolean = false;
     private queue: QueuedIntent[] = [];
     private recentRuns: RunRecord[] = [];
@@ -76,16 +81,26 @@ class DeviceOrchestratorServiceClass {
     }
 
     async checkConnectivity(): Promise<boolean> {
-        // Try Tailscale first
-        for (const url of [ORCH_URL_TAILSCALE, ORCH_URL_LAN]) {
+        // Try local Tasker first (same phone), then Mac orchestrator
+        for (const url of [TASKER_LOCAL, ORCH_URL_TAILSCALE, ORCH_URL_LAN]) {
             try {
                 const controller = new AbortController();
                 const timeout = setTimeout(() => controller.abort(), 3000);
-                const res = await fetch(`${url}/health`, { signal: controller.signal });
+                // Tasker uses /command endpoint, orchestrator uses /health
+                const endpoint = url === TASKER_LOCAL ? `${url}/command` : `${url}/health`;
+                const method = url === TASKER_LOCAL ? 'POST' : 'GET';
+                const res = await fetch(endpoint, {
+                    method,
+                    headers: method === 'POST' ? { 'Content-Type': 'application/json' } : undefined,
+                    body: method === 'POST' ? JSON.stringify({ skill_id: 'health_check' }) : undefined,
+                    signal: controller.signal,
+                });
                 clearTimeout(timeout);
                 if (res.ok) {
                     this.baseUrl = url;
+                    this.isTaskerDirect = url === TASKER_LOCAL;
                     this.online = true;
+                    console.log(`[DeviceOrch] Connected to ${url === TASKER_LOCAL ? 'local Tasker' : 'Mac orchestrator'}`);
                     await this._flushQueue();
                     return true;
                 }
@@ -119,27 +134,63 @@ class DeviceOrchestratorServiceClass {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-            const res = await fetch(`${this.baseUrl}/intent/dispatch`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    intent,
-                    device_id: deviceId,
-                    args,
-                    idempotency_key: idempotencyKey,
-                }),
-                signal: controller.signal,
-            });
+            let run: RunRecord;
 
-            clearTimeout(timeout);
-            const run = (await res.json()) as RunRecord;
+            if (this.isTaskerDirect) {
+                // Direct to Tasker HTTP Server on same phone
+                const res = await fetch(`${this.baseUrl}/command`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        skill_id: intent,
+                        run_id: idempotencyKey,
+                        args: args || {},
+                        kill_switch_level: 0,
+                    }),
+                    signal: controller.signal,
+                });
+                clearTimeout(timeout);
+                const taskerResult = await res.json();
+
+                // Map Tasker response to RunRecord format
+                run = {
+                    run_id: idempotencyKey,
+                    idempotency_key: idempotencyKey,
+                    skill_id: intent,
+                    device_id: deviceId,
+                    args: args || {},
+                    risk_tier: 'T1',
+                    status: taskerResult.success ? 'completed' : 'failed',
+                    requested_at: new Date().toISOString(),
+                    completed_at: new Date().toISOString(),
+                    policy_hash: null,
+                    kill_switch_level: '0',
+                    result: taskerResult,
+                    error: taskerResult.success ? null : (taskerResult.error || 'Tasker execution failed'),
+                };
+            } else {
+                // Via Mac orchestrator (policy gate)
+                const res = await fetch(`${this.baseUrl}/intent/dispatch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        intent,
+                        device_id: deviceId,
+                        args,
+                        idempotency_key: idempotencyKey,
+                    }),
+                    signal: controller.signal,
+                });
+                clearTimeout(timeout);
+                run = (await res.json()) as RunRecord;
+            }
 
             // Track locally
             this.recentRuns.unshift(run);
             if (this.recentRuns.length > 50) this.recentRuns.pop();
 
             return {
-                ok: run.status === 'dispatched',
+                ok: run.status === 'completed' || run.status === 'dispatched',
                 run,
                 error: run.error ?? undefined,
             };
@@ -261,15 +312,15 @@ class DeviceOrchestratorServiceClass {
 
         for (const item of pending) {
             try {
-                const res = await fetch(`${this.baseUrl}/intent/dispatch`, {
+                const endpoint = this.isTaskerDirect ? `${this.baseUrl}/command` : `${this.baseUrl}/intent/dispatch`;
+                const body = this.isTaskerDirect
+                    ? { skill_id: item.intent, run_id: item.idempotency_key, args: item.args || {}, kill_switch_level: 0 }
+                    : { intent: item.intent, device_id: item.device_id, args: item.args, idempotency_key: item.idempotency_key };
+
+                const res = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        intent: item.intent,
-                        device_id: item.device_id,
-                        args: item.args,
-                        idempotency_key: item.idempotency_key,
-                    }),
+                    body: JSON.stringify(body),
                 });
                 if (!res.ok) {
                     this.queue.push(item);
