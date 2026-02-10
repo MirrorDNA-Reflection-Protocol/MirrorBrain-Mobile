@@ -24,9 +24,10 @@ import {
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
 import { GlassView } from '../components';
-import { RouterService, HapticService, DeviceOrchestratorService, PassiveIntelligenceService } from '../services';
+import { RouterService, HapticService, DeviceOrchestratorService, PassiveIntelligenceService, NudgeService } from '../services';
 import type { RunRecord } from '../services/device_orchestrator.service';
 import type { ClipboardCapture, NotificationData } from '../services/passive.service';
+import type { Nudge } from '../services/nudge.service';
 import { RunsFeedScreen } from './RunsFeedScreen';
 import { TrustPanelScreen } from './TrustPanelScreen';
 import { VoiceDispatchModal } from '../components/VoiceDispatchModal';
@@ -59,6 +60,7 @@ export const PulseScreen: React.FC = () => {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [recentClips, setRecentClips] = useState<ClipboardCapture[]>([]);
     const [recentNotifs, setRecentNotifs] = useState<NotificationData[]>([]);
+    const [activeNudges, setActiveNudges] = useState<Nudge[]>([]);
 
     useEffect(() => {
         const interval = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -80,8 +82,14 @@ export const PulseScreen: React.FC = () => {
             .then(notifs => setRecentNotifs(notifs.slice(0, 5)))
             .catch(() => {});
 
+        // Subscribe to nudges
+        setActiveNudges(NudgeService.getActiveNudges());
+        const unsubNudge = NudgeService.subscribe(() => {
+            setActiveNudges(NudgeService.getActiveNudges());
+        });
+
         return () => {
-            // Cleanup handled by service singleton
+            unsubNudge();
         };
     }, []);
 
@@ -223,6 +231,38 @@ export const PulseScreen: React.FC = () => {
                     )}
                 </GlassView>
 
+                {/* Active Nudges */}
+                {activeNudges.length > 0 && (
+                    <GlassView style={styles.nudgeCard} variant="subtle">
+                        <Text style={styles.sectionTitle}>Needs Attention</Text>
+                        {activeNudges.slice(0, 4).map(nudge => (
+                            <View key={nudge.id} style={styles.nudgeRow}>
+                                <View style={[
+                                    styles.nudgePriority,
+                                    { backgroundColor: nudge.priority === 'urgent' ? colors.error
+                                        : nudge.priority === 'high' ? colors.warning
+                                        : colors.accentPrimary },
+                                ]} />
+                                <View style={styles.nudgeContent}>
+                                    <Text style={styles.nudgeTitle}>{nudge.title}</Text>
+                                    <Text style={styles.nudgeMessage} numberOfLines={1}>{nudge.message}</Text>
+                                </View>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        HapticService.tap();
+                                        NudgeService.dismiss(nudge.id);
+                                        setActiveNudges(NudgeService.getActiveNudges());
+                                    }}
+                                    style={styles.nudgeDismiss}
+                                    activeOpacity={0.6}
+                                >
+                                    <Text style={styles.nudgeDismissText}>x</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ))}
+                    </GlassView>
+                )}
+
                 {/* Context Feed — PassiveIntelligence */}
                 {(recentClips.length > 0 || recentNotifs.length > 0) && (
                     <GlassView style={styles.contextCard} variant="subtle">
@@ -361,6 +401,15 @@ const styles = StyleSheet.create({
 
     queueCard: { padding: spacing.sm },
     queueText: { ...typography.bodySmall, color: colors.warning, textAlign: 'center' },
+
+    nudgeCard: { padding: spacing.md, marginBottom: spacing.md },
+    nudgeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, gap: spacing.sm },
+    nudgePriority: { width: 4, height: 28, borderRadius: 2 },
+    nudgeContent: { flex: 1 },
+    nudgeTitle: { ...typography.labelSmall, color: colors.textPrimary, fontWeight: '600' },
+    nudgeMessage: { ...typography.bodySmall, color: colors.textMuted, marginTop: 1 },
+    nudgeDismiss: { padding: spacing.xs, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+    nudgeDismissText: { ...typography.labelSmall, color: colors.textMuted, fontWeight: '700' },
 
     contextCard: { padding: spacing.md, marginBottom: spacing.md },
     contextRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 3, gap: spacing.xs },

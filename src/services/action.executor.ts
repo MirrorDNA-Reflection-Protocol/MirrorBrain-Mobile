@@ -11,6 +11,8 @@ import { CalendarService } from './calendar.service';
 import { AppLauncherService } from './applauncher.service';
 import { ContactsService } from './contacts.service';
 import { DeviceOrchestratorService } from './device_orchestrator.service';
+import { BriefingService } from './briefing.service';
+import { FocusService } from './focus.service';
 import { HapticSymphony } from './HapticSymphony';
 import type { ParsedIntent, IntentType } from './intent.parser';
 
@@ -480,6 +482,90 @@ class ActionExecutorClass {
                     message: `Setting "${subject}" — let me think about that...`,
                     data: { passToAI: true },
                 };
+            },
+        });
+
+        // Briefing handler — "brief me", "what's happening"
+        this.registerHandler({
+            type: 'briefing',
+            canExecute: () => true,
+            execute: async () => {
+                try {
+                    const briefing = await BriefingService.generateQuickBriefing();
+                    const parts = [briefing.greeting + '.', briefing.summary];
+                    for (const section of briefing.sections) {
+                        parts.push(`${section.title}: ${section.content}`);
+                    }
+                    if (briefing.aiInsight) parts.push(briefing.aiInsight);
+                    HapticSymphony.success();
+                    return { success: true, message: parts.join(' ') };
+                } catch (error) {
+                    return { success: false, message: `Briefing failed: ${error}` };
+                }
+            },
+        });
+
+        // Goodnight handler — DND on, brightness down, evening review
+        this.registerHandler({
+            type: 'goodnight',
+            canExecute: () => true,
+            execute: async () => {
+                try {
+                    // DND on + brightness down in parallel
+                    await Promise.all([
+                        DeviceOrchestratorService.dispatch('toggle_dnd', 'local', { state: 'on' }),
+                        DeviceOrchestratorService.dispatch('set_brightness', 'local', { level: 10 }),
+                    ]);
+                    // Generate evening review
+                    let summary = 'Sleep well.';
+                    try {
+                        const briefing = await BriefingService.generateEveningBriefing();
+                        summary = briefing.summary || summary;
+                        if (briefing.aiInsight) summary += ' ' + briefing.aiInsight;
+                    } catch {
+                        // Briefing optional
+                    }
+                    HapticSymphony.success();
+                    return {
+                        success: true,
+                        message: `Goodnight! DND is on, screen dimmed. ${summary}`,
+                    };
+                } catch (error) {
+                    return { success: false, message: `Goodnight routine failed: ${error}` };
+                }
+            },
+        });
+
+        // Focus handler — start/end deep work with auto-DND
+        this.registerHandler({
+            type: 'focus',
+            canExecute: () => true,
+            execute: async (intent) => {
+                const isEnd = intent.entities.command === 'end';
+                try {
+                    if (isEnd) {
+                        const status = await FocusService.getStatus();
+                        await FocusService.end();
+                        await DeviceOrchestratorService.dispatch('toggle_dnd', 'local', { state: 'off' });
+                        HapticSymphony.success();
+                        const minutes = status.elapsedMinutes || 0;
+                        return {
+                            success: true,
+                            message: `Focus mode ended.${minutes > 0 ? ` You focused for ${minutes} minutes.` : ''} DND off.`,
+                        };
+                    } else {
+                        const duration = intent.entities.duration || 50;
+                        await FocusService.start({ duration, reason: 'Voice activated' });
+                        await DeviceOrchestratorService.dispatch('toggle_dnd', 'local', { state: 'on' });
+                        HapticSymphony.success();
+                        return {
+                            success: true,
+                            message: `Focus mode activated for ${duration} minutes. DND is on. Stay locked in.`,
+                        };
+                    }
+                } catch (error) {
+                    return { success: false, message: `Focus command failed: ${error}` };
+                }
             },
         });
 

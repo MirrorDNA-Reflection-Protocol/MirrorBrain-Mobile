@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { VaultService } from './vault.service';
 import { NotificationFilter, ClassifiedNotification } from './notification.filter';
+import { NudgeService } from './nudge.service';
 
 const { PassiveIntelligence } = NativeModules;
 
@@ -144,6 +145,52 @@ class ClipboardWatcherClass {
         // Auto-save to vault if enabled and high-confidence structured data
         if (this.autoSaveToVault && capture.confidence >= 0.7 && capture.type !== 'text') {
             await this.saveToVault(capture);
+        }
+
+        // Clipboard Intelligence — push contextual action nudges
+        if (capture.confidence >= 0.7) {
+            this.pushClipboardNudge(capture);
+        }
+    }
+
+    private pushClipboardNudge(capture: ClipboardCapture): void {
+        switch (capture.type) {
+            case 'phone':
+                NudgeService.pushNudge({
+                    title: 'Phone Number Copied',
+                    message: `${capture.text} — Call or WhatsApp?`,
+                    priority: 'medium',
+                    action: { label: 'WhatsApp', type: 'execute', payload: { skill: 'send_whatsapp', phone: capture.text } },
+                    expiresIn: 300000,
+                });
+                break;
+            case 'url':
+                NudgeService.pushNudge({
+                    title: 'Link Copied',
+                    message: capture.text.length > 60 ? capture.text.slice(0, 57) + '...' : capture.text,
+                    priority: 'low',
+                    action: { label: 'Open', type: 'open_app', payload: { url: capture.text } },
+                    expiresIn: 300000,
+                });
+                break;
+            case 'email':
+                NudgeService.pushNudge({
+                    title: 'Email Copied',
+                    message: `${capture.text} — Compose?`,
+                    priority: 'low',
+                    action: { label: 'Compose', type: 'open_app', payload: { email: capture.text } },
+                    expiresIn: 300000,
+                });
+                break;
+            case 'address':
+                NudgeService.pushNudge({
+                    title: 'Address Copied',
+                    message: capture.text.length > 60 ? capture.text.slice(0, 57) + '...' : capture.text,
+                    priority: 'low',
+                    action: { label: 'Navigate', type: 'open_app', payload: { address: capture.text } },
+                    expiresIn: 300000,
+                });
+                break;
         }
     }
 

@@ -17,6 +17,9 @@ export type IntentType =
     | 'navigate'
     | 'settings'
     | 'device_skill'
+    | 'briefing'
+    | 'goodnight'
+    | 'focus'
     | 'unknown';
 
 export interface ParsedIntent {
@@ -352,6 +355,57 @@ const INTENT_PATTERNS: IntentPattern[] = [
         },
     },
 
+    // Briefing patterns — "brief me", "what's happening", "catch me up"
+    {
+        type: 'briefing',
+        patterns: [
+            /^brief\s*(?:me|ing)?$/i,
+            /^(?:what(?:'?s|\s+is)\s+happening|catch\s+me\s+up|what\s+did\s+i\s+miss|update\s+me)$/i,
+            /^(?:morning\s+)?brief(?:ing)?$/i,
+            /^what(?:'?s|\s+is)\s+(?:on\s+)?(?:my\s+)?(?:schedule|agenda|plan)(?:\s+today)?$/i,
+            /^(?:give\s+me\s+)?(?:a\s+)?(?:status|summary|recap|rundown)$/i,
+        ],
+        extractor: () => ({}),
+    },
+
+    // Goodnight patterns — "goodnight", "going to sleep", "bedtime"
+    {
+        type: 'goodnight',
+        patterns: [
+            /^good\s*night$/i,
+            /^(?:going\s+to\s+)?(?:sleep|bed)(?:time)?$/i,
+            /^(?:night\s*night|nighty?\s*night|gn)$/i,
+            /^(?:i(?:'?m|\s+am)\s+)?(?:going\s+to\s+)?(?:sleep|bed)/i,
+            /^(?:wind\s+down|shut\s+(?:it\s+)?down\s+for\s+(?:the\s+)?night)/i,
+        ],
+        extractor: () => ({}),
+    },
+
+    // Focus patterns — "focus mode", "deep work", "end focus"
+    {
+        type: 'focus',
+        patterns: [
+            /^(?:start\s+)?(?:focus|deep\s*work)\s*(?:mode)?$/i,
+            /^(?:i\s+need\s+to\s+)?focus$/i,
+            /^(?:start\s+)?(?:a\s+)?pomodoro$/i,
+            /^(?:end|stop|exit|cancel)\s+(?:focus|deep\s*work)\s*(?:mode)?$/i,
+            /^(?:i(?:'?m|\s+am)\s+)?done\s+(?:focusing|with\s+focus)/i,
+            /^(?:focus|deep\s*work)\s+(?:for\s+)?(\d+)\s*(?:min(?:ute)?s?)?$/i,
+        ],
+        extractor: (match) => {
+            const text = match[0].toLowerCase();
+            const isEnd = /end|stop|exit|cancel|done/.test(text);
+            let duration = /pomodoro/.test(text) ? 25 : 50;
+            if (match[1] && /^\d+$/.test(match[1])) {
+                duration = parseInt(match[1], 10);
+            }
+            return {
+                command: isEnd ? 'end' : 'start',
+                duration,
+            };
+        },
+    },
+
     // Settings patterns (catch-all for on/off patterns not caught above)
     {
         type: 'settings',
@@ -585,6 +639,12 @@ class IntentParserClass {
                 return `Change setting: ${intent.entities.subject}`;
             case 'device_skill':
                 return `Device: ${intent.entities.skillId || 'command'}`;
+            case 'briefing':
+                return 'Generating briefing...';
+            case 'goodnight':
+                return 'Starting goodnight routine...';
+            case 'focus':
+                return intent.entities.command === 'end' ? 'Ending focus mode...' : 'Starting focus mode...';
             default:
                 return 'Ask MirrorBrain';
         }
