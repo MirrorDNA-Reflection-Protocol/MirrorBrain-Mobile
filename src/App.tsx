@@ -29,6 +29,10 @@ import {
     OverlayService,
     GestureService,
     HapticService,
+    NudgeService,
+    AssistantService,
+    DeviceOrchestratorService,
+    CircadianEngine,
 } from './services';
 import { colors, spacing } from './theme';
 import { moderateScale } from './theme/responsive';
@@ -105,6 +109,57 @@ export const App: React.FC = () => {
                 console.log('[App] Gesture service started');
             } catch (gestureError) {
                 console.warn('[App] Gesture service failed:', gestureError);
+            }
+
+            // Initialize Device Orchestrator (connects to Tasker on localhost:8081)
+            try {
+                await DeviceOrchestratorService.initialize();
+                console.log('[App] Device orchestrator initialized, online:', DeviceOrchestratorService.isOnline());
+            } catch (orchError) {
+                console.warn('[App] Device orchestrator failed:', orchError);
+            }
+
+            // Start proactive nudge engine (battery, meetings, time-based)
+            try {
+                NudgeService.start();
+                NudgeService.subscribe((nudge) => {
+                    console.log('[App] Nudge:', nudge.title, '-', nudge.message);
+                });
+                console.log('[App] Nudge service started');
+            } catch (nudgeError) {
+                console.warn('[App] Nudge service failed:', nudgeError);
+            }
+
+            // Initialize assistant service (wake word + double-tap triggers)
+            try {
+                await AssistantService.initialize();
+                AssistantService.onTrigger((event) => {
+                    console.log('[App] Assistant triggered via:', event.type);
+                    HapticService.impact();
+                    // Navigate to ASK panel on any trigger
+                    scrollViewRef.current?.scrollTo({ x: 2 * screenWidth, animated: true });
+                    setCurrentPanel('ASK');
+                });
+                console.log('[App] Assistant service initialized');
+            } catch (assistantError) {
+                console.warn('[App] Assistant service failed:', assistantError);
+            }
+
+            // Start Circadian Intelligence Engine — the conductor
+            try {
+                await CircadianEngine.start();
+                CircadianEngine.subscribe((event) => {
+                    if (event.type === 'phase_change') {
+                        console.log(`[App] Circadian phase: ${event.phase} (${event.attentionState})`);
+                    }
+                    if (event.type === 'delivery' && event.synthesis) {
+                        console.log(`[App] Circadian delivery: "${event.synthesis.slice(0, 60)}..."`);
+                    }
+                });
+                const state = CircadianEngine.getState();
+                console.log(`[App] Circadian engine started — phase: ${state.phase}, attention: ${state.attentionState}`);
+            } catch (circadianError) {
+                console.warn('[App] Circadian engine failed:', circadianError);
             }
 
             if (!hasIdentity) {

@@ -13,6 +13,8 @@ import { NativeModules, NativeEventEmitter, AppState, Platform } from 'react-nat
 import { VoiceService } from './voice.service';
 import { TTSService } from './tts.service';
 import { OrchestratorService } from './orchestrator.service';
+import { IntentParser } from './intent.parser';
+import { ActionExecutor } from './action.executor';
 
 const { WakeWordModule, DoubleTapModule } = NativeModules;
 
@@ -254,18 +256,31 @@ class AssistantServiceClass {
     }
 
     /**
-     * Process voice input through orchestrator
+     * Process voice input — smart routing: fast intent path, then LLM fallback
      */
     async processVoiceInput(text: string): Promise<string> {
         console.log('[AssistantService] Processing:', text);
 
         try {
-            // Process through orchestrator
-            const result = await OrchestratorService.orchestrate(text);
+            // Fast path: check if this is a direct device command
+            const parsed = IntentParser.parse(text);
 
-            const response = result.finalAnswer || result.synthesis || 'I understood: ' + text;
+            if (parsed.type !== 'unknown' && parsed.confidence > 0.6) {
+                const actionResult = await ActionExecutor.execute(parsed);
 
-            // Speak response if enabled
+                if (!actionResult.data?.passToAI) {
+                    const response = actionResult.message;
+                    if (this.config.speakResponses) {
+                        await TTSService.speak(response);
+                    }
+                    return response;
+                }
+            }
+
+            // Slow path: LLM ReAct agent
+            const result = await OrchestratorService.run(text);
+            const response = result.finalAnswer || 'I understood: ' + text;
+
             if (this.config.speakResponses) {
                 await TTSService.speak(response);
             }

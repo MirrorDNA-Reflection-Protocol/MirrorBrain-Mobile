@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
 import { useLLM, useSessionRestore } from '../hooks';
-import { VaultService, IdentityService, HapticSymphony, VoiceService, SearchService, OrchestratorService, TTSService } from '../services';
+import { VaultService, IdentityService, HapticSymphony, VoiceService, SearchService, OrchestratorService, TTSService, IntentParser, ActionExecutor } from '../services';
 import type { SearchResult, MemorySpark } from '../services';
 import { BrowserPane, SearchResultCard, Logo } from '../components';
 import { RefineButton } from '../components/RefineButton';
@@ -252,7 +252,48 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                 // No action needed if RAG fails, just proceed without context
             }
 
-            // Run via OrchestratorService (ReAct agent loop with tools)
+            // ─── SMART ROUTING: Fast intent path before LLM ───
+            const parsed = IntentParser.parse(messageText);
+            console.log('[AskScreen] Intent:', parsed.type, 'confidence:', parsed.confidence);
+
+            if (parsed.type !== 'unknown' && parsed.confidence > 0.6) {
+                // Fast path: direct action execution (no LLM needed)
+                setIsAgentRunning(true);
+                setAgentStatus(IntentParser.getActionDescription(parsed));
+
+                try {
+                    const actionResult = await ActionExecutor.execute(parsed);
+
+                    // If handler says passToAI, fall through to LLM path
+                    if (actionResult.data?.passToAI) {
+                        console.log('[AskScreen] Action deferred to AI');
+                        // Fall through below
+                    } else {
+                        const assistantMessage: ChatMessage = {
+                            role: 'assistant',
+                            content: actionResult.message,
+                            timestamp: new Date(),
+                        };
+                        setMessages([...newMessages, assistantMessage]);
+
+                        if (actionResult.message) {
+                            TTSService.speak(actionResult.message);
+                        }
+
+                        setIsAgentRunning(false);
+                        setAgentStatus('');
+                        return; // Done — no LLM needed
+                    }
+                } catch (error) {
+                    console.error('[AskScreen] Action error, falling through to LLM:', error);
+                } finally {
+                    if (!isAgentRunning) {
+                        // Already returned above on success
+                    }
+                }
+            }
+
+            // ─── SLOW PATH: LLM ReAct agent loop ───
             setIsAgentRunning(true);
             setAgentStatus('Thinking...');
 

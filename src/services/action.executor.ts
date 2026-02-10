@@ -10,6 +10,7 @@ import { VaultService } from './vault.service';
 import { CalendarService } from './calendar.service';
 import { AppLauncherService } from './applauncher.service';
 import { ContactsService } from './contacts.service';
+import { DeviceOrchestratorService } from './device_orchestrator.service';
 import { HapticSymphony } from './HapticSymphony';
 import type { ParsedIntent, IntentType } from './intent.parser';
 
@@ -157,6 +158,21 @@ class ActionExecutorClass {
                 }
 
                 try {
+                    // Try via Tasker first (handles friendly names like "obsidian", "spotify")
+                    const taskerResult = await DeviceOrchestratorService.dispatch(
+                        'launch_app',
+                        'local',
+                        { package_name: appName },
+                    );
+                    if (taskerResult.ok) {
+                        HapticSymphony.tap();
+                        return {
+                            success: true,
+                            message: `Opening ${appName}`,
+                        };
+                    }
+
+                    // Fallback to local AppLauncherService
                     const success = await AppLauncherService.launchApp(appName);
 
                     if (success) {
@@ -378,6 +394,95 @@ class ActionExecutorClass {
             },
         });
 
+        // Device skill handler — routes through DeviceOrchestratorService → Tasker
+        this.registerHandler({
+            type: 'device_skill',
+            canExecute: (intent) => !!intent.entities.skillId,
+            execute: async (intent) => {
+                const { skillId, skillArgs } = intent.entities;
+                if (!skillId) {
+                    return { success: false, message: 'Unknown device command' };
+                }
+
+                try {
+                    const result = await DeviceOrchestratorService.dispatch(
+                        skillId,
+                        'local',
+                        skillArgs || {},
+                    );
+
+                    if (result.ok) {
+                        HapticSymphony.success();
+                        const taskResult = result.run?.result as Record<string, unknown> | undefined;
+                        return {
+                            success: true,
+                            message: this.formatDeviceResult(skillId, skillArgs || {}, taskResult),
+                            data: result.run,
+                        };
+                    } else {
+                        return {
+                            success: false,
+                            message: result.error || `Failed to execute ${skillId}`,
+                            data: result.queued ? { queued: true } : undefined,
+                        };
+                    }
+                } catch (error) {
+                    return {
+                        success: false,
+                        message: `Device command failed: ${error}`,
+                    };
+                }
+            },
+        });
+
+        // Settings handler — maps to device skills where possible
+        this.registerHandler({
+            type: 'settings',
+            canExecute: (intent) => !!intent.entities.subject,
+            execute: async (intent) => {
+                const subject = intent.entities.subject?.toLowerCase() || '';
+                const cmd = intent.entities.command?.toLowerCase() || '';
+                const isOn = /on|enable/.test(cmd);
+
+                // Map common settings to device skills
+                const settingsMap: Record<string, { skillId: string; args: Record<string, unknown> }> = {
+                    'wifi': { skillId: 'toggle_wifi', args: { state: isOn ? 'on' : 'off' } },
+                    'bluetooth': { skillId: 'toggle_bluetooth', args: { state: isOn ? 'on' : 'off' } },
+                    'flashlight': { skillId: 'toggle_flashlight', args: { state: isOn ? 'on' : 'off' } },
+                    'torch': { skillId: 'toggle_flashlight', args: { state: isOn ? 'on' : 'off' } },
+                    'dnd': { skillId: 'toggle_dnd', args: { state: isOn ? 'on' : 'off' } },
+                    'do not disturb': { skillId: 'toggle_dnd', args: { state: isOn ? 'on' : 'off' } },
+                };
+
+                const mapping = settingsMap[subject];
+                if (mapping) {
+                    try {
+                        const result = await DeviceOrchestratorService.dispatch(
+                            mapping.skillId,
+                            'local',
+                            mapping.args,
+                        );
+                        if (result.ok) {
+                            HapticSymphony.success();
+                            return {
+                                success: true,
+                                message: `${subject} turned ${isOn ? 'on' : 'off'}`,
+                            };
+                        }
+                        return { success: false, message: result.error || `Failed to toggle ${subject}` };
+                    } catch (error) {
+                        return { success: false, message: `Failed: ${error}` };
+                    }
+                }
+
+                return {
+                    success: true,
+                    message: `Setting "${subject}" — let me think about that...`,
+                    data: { passToAI: true },
+                };
+            },
+        });
+
         // Search handler (passthrough to MirrorMesh)
         this.registerHandler({
             type: 'search',
@@ -452,6 +557,47 @@ class ActionExecutorClass {
     canExecute(intent: ParsedIntent): boolean {
         const handler = this.handlers.get(intent.type);
         return handler ? handler.canExecute(intent) : false;
+    }
+
+    /**
+     * Format device skill result into natural language
+     */
+    private formatDeviceResult(skillId: string, args: Record<string, unknown>, result?: Record<string, unknown>): string {
+        switch (skillId) {
+            case 'battery_status': {
+                const pct = result?.percentage;
+                const status = result?.status;
+                return pct != null ? `Battery is at ${pct}%${status === 'CHARGING' ? ', charging' : ''}` : 'Battery status checked';
+            }
+            case 'set_volume':
+                return `Volume set to ${args.level}`;
+            case 'set_brightness':
+                return args.auto ? 'Brightness set to auto' : `Brightness set to ${args.level}`;
+            case 'toggle_flashlight':
+                return `Flashlight ${args.state}`;
+            case 'toggle_wifi':
+                return `WiFi turned ${args.state}`;
+            case 'toggle_bluetooth':
+                return `Bluetooth turned ${args.state}`;
+            case 'toggle_dnd':
+                return `Do not disturb ${args.state}`;
+            case 'media_control':
+                return `Media ${args.action}`;
+            case 'screenshot':
+                return 'Screenshot taken';
+            case 'set_alarm':
+                return `Alarm set for ${args.hour}:${String(args.minute).padStart(2, '0')}`;
+            case 'clipboard_get':
+                return result?.text ? `Clipboard: ${result.text}` : 'Clipboard is empty';
+            case 'clipboard_set':
+                return 'Copied to clipboard';
+            case 'send_whatsapp':
+                return `Opening WhatsApp to ${args.phone}`;
+            case 'send_sms':
+                return `Opening SMS to ${args.phone}`;
+            default:
+                return `Done: ${skillId}`;
+        }
     }
 
     /**

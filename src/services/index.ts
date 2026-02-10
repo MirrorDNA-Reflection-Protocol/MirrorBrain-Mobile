@@ -223,3 +223,14 @@ export {
     type PresenceMessage,
     type MeshMessage,
 } from './mesh.service';
+
+// Circadian Intelligence Engine — The Conductor
+export {
+    CircadianEngine,
+    type CircadianPhase,
+    type AttentionState,
+    type AttentionItem,
+    type CircadianState,
+    type CircadianConfig,
+    type CircadianEvent,
+} from './circadian.engine';

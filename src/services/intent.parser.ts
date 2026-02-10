@@ -16,6 +16,7 @@ export type IntentType =
     | 'call'
     | 'navigate'
     | 'settings'
+    | 'device_skill'
     | 'unknown';
 
 export interface ParsedIntent {
@@ -50,6 +51,10 @@ export interface IntentEntities {
 
     // Query
     query?: string;
+
+    // Device skill
+    skillId?: string;
+    skillArgs?: Record<string, unknown>;
 }
 
 // Pattern definitions for intent matching
@@ -186,7 +191,168 @@ const INTENT_PATTERNS: IntentPattern[] = [
         }),
     },
 
-    // Settings patterns
+    // Device skill patterns — map natural language to Tasker HTTP server skills
+    {
+        type: 'device_skill',
+        patterns: [
+            /(?:set\s+)?(?:the\s+)?volume\s+(?:to\s+)?(\d+)/i,
+            /(?:turn\s+)?(?:the\s+)?volume\s+(up|down|max|min|mute)/i,
+        ],
+        extractor: (match) => {
+            let level = 7;
+            const val = match[1]?.toLowerCase();
+            if (val === 'up') level = 12;
+            else if (val === 'down') level = 4;
+            else if (val === 'max') level = 15;
+            else if (val === 'min' || val === 'mute') level = 0;
+            else if (/^\d+$/.test(val)) level = Math.min(15, parseInt(val, 10));
+            return { skillId: 'set_volume', skillArgs: { stream: 'media', level } };
+        },
+    },
+    {
+        type: 'device_skill',
+        patterns: [
+            /(?:set\s+)?(?:the\s+)?brightness\s+(?:to\s+)?(\d+)/i,
+            /(?:turn\s+)?brightness\s+(up|down|max|min|auto)/i,
+        ],
+        extractor: (match) => {
+            const val = match[1]?.toLowerCase();
+            if (val === 'auto') return { skillId: 'set_brightness', skillArgs: { auto: true } };
+            let level = 128;
+            if (val === 'up' || val === 'max') level = 255;
+            else if (val === 'down' || val === 'min') level = 20;
+            else if (/^\d+$/.test(val)) level = Math.min(255, parseInt(val, 10));
+            return { skillId: 'set_brightness', skillArgs: { level } };
+        },
+    },
+    {
+        type: 'device_skill',
+        patterns: [
+            /(?:turn\s+)?(?:on|off)\s+(?:the\s+)?(?:flash\s*light|torch)/i,
+            /(?:flash\s*light|torch)\s+(on|off)/i,
+        ],
+        extractor: (match) => {
+            const state = /off/i.test(match[0]) ? 'off' : 'on';
+            return { skillId: 'toggle_flashlight', skillArgs: { state } };
+        },
+    },
+    {
+        type: 'device_skill',
+        patterns: [
+            /(?:turn\s+)?(?:on|off)\s+(?:the\s+)?wi-?fi/i,
+            /wi-?fi\s+(on|off)/i,
+        ],
+        extractor: (match) => {
+            const state = /off/i.test(match[0]) ? 'off' : 'on';
+            return { skillId: 'toggle_wifi', skillArgs: { state } };
+        },
+    },
+    {
+        type: 'device_skill',
+        patterns: [
+            /(?:turn\s+)?(?:on|off)\s+(?:the\s+)?bluetooth/i,
+            /bluetooth\s+(on|off)/i,
+        ],
+        extractor: (match) => {
+            const state = /off/i.test(match[0]) ? 'off' : 'on';
+            return { skillId: 'toggle_bluetooth', skillArgs: { state } };
+        },
+    },
+    {
+        type: 'device_skill',
+        patterns: [
+            /(?:turn\s+)?(?:on|off)\s+(?:do\s+not\s+disturb|dnd)/i,
+            /(?:do\s+not\s+disturb|dnd)\s+(on|off)/i,
+        ],
+        extractor: (match) => {
+            const state = /off/i.test(match[0]) ? 'off' : 'on';
+            return { skillId: 'toggle_dnd', skillArgs: { state } };
+        },
+    },
+    {
+        type: 'device_skill',
+        patterns: [
+            /(?:play|resume)\s+(?:the\s+)?music/i,
+            /(?:pause|stop)\s+(?:the\s+)?music/i,
+            /(?:next|skip)\s+(?:track|song)/i,
+            /(?:previous|prev|last)\s+(?:track|song)/i,
+            /(?:play|pause|stop|next|previous|skip)\s*$/i,
+        ],
+        extractor: (match) => {
+            const text = match[0].toLowerCase();
+            let action = 'play_pause';
+            if (/pause|stop/.test(text)) action = 'pause';
+            else if (/play|resume/.test(text)) action = 'play';
+            else if (/next|skip/.test(text)) action = 'next';
+            else if (/prev/.test(text)) action = 'previous';
+            return { skillId: 'media_control', skillArgs: { action } };
+        },
+    },
+    {
+        type: 'device_skill',
+        patterns: [
+            /(?:what(?:'?s|\s+is)\s+(?:the\s+)?|check\s+(?:the\s+)?)battery/i,
+            /battery\s+(?:level|status|percent)/i,
+            /how\s+much\s+battery/i,
+        ],
+        extractor: () => ({ skillId: 'battery_status', skillArgs: {} }),
+    },
+    {
+        type: 'device_skill',
+        patterns: [
+            /take\s+(?:a\s+)?screenshot/i,
+            /capture\s+(?:the\s+)?screen/i,
+            /screen\s*shot/i,
+        ],
+        extractor: () => ({ skillId: 'screenshot', skillArgs: {} }),
+    },
+    {
+        type: 'device_skill',
+        patterns: [
+            /(?:set\s+)?(?:an?\s+)?alarm\s+(?:for\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i,
+            /wake\s+(?:me\s+)?(?:up\s+)?(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i,
+        ],
+        extractor: (match) => {
+            let hour = parseInt(match[1], 10);
+            const minute = parseInt(match[2] || '0', 10);
+            const ampm = match[3]?.toLowerCase();
+            if (ampm === 'pm' && hour < 12) hour += 12;
+            if (ampm === 'am' && hour === 12) hour = 0;
+            return { skillId: 'set_alarm', skillArgs: { hour, minute } };
+        },
+    },
+    {
+        type: 'device_skill',
+        patterns: [
+            /(?:copy|clipboard)\s+(.+)/i,
+            /(?:set|put)\s+(?:the\s+)?clipboard\s+(?:to\s+)?(.+)/i,
+        ],
+        extractor: (match) => {
+            const text = (match[1] || match[2])?.trim();
+            return { skillId: 'clipboard_set', skillArgs: { text } };
+        },
+    },
+    {
+        type: 'device_skill',
+        patterns: [
+            /(?:what(?:'?s|\s+is)\s+(?:in\s+)?(?:the\s+)?|read\s+(?:the\s+)?|paste\s+(?:the\s+)?)clipboard/i,
+        ],
+        extractor: () => ({ skillId: 'clipboard_get', skillArgs: {} }),
+    },
+    {
+        type: 'device_skill',
+        patterns: [
+            /(?:whatsapp|wa)\s+(.+?)(?:\s+(?:saying|that|message|:)\s+(.+))?$/i,
+            /(?:send\s+)?(?:a\s+)?whatsapp\s+(?:to\s+)?(.+?)(?:\s+(?:saying|that|message|:)\s+(.+))?$/i,
+        ],
+        extractor: (match) => {
+            const phone = match[1]?.trim();
+            const message = match[2]?.trim() || '';
+            return { skillId: 'send_whatsapp', skillArgs: { phone, message } };
+        },
+    },
+
+    // Settings patterns (catch-all for on/off patterns not caught above)
     {
         type: 'settings',
         patterns: [
@@ -417,6 +583,8 @@ class IntentParserClass {
                 return `Search: ${intent.entities.query}`;
             case 'settings':
                 return `Change setting: ${intent.entities.subject}`;
+            case 'device_skill':
+                return `Device: ${intent.entities.skillId || 'command'}`;
             default:
                 return 'Ask MirrorBrain';
         }
