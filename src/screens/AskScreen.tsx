@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { colors, typography, spacing, glyphs } from '../theme';
 import { useLLM, useSessionRestore } from '../hooks';
-import { VaultService, IdentityService, HapticSymphony, VoiceService, SearchService, OrchestratorService, TTSService, IntentParser, ActionExecutor } from '../services';
+import { VaultService, IdentityService, HapticSymphony, VoiceService, SearchService, OrchestratorService, TTSService, IntentParser, ActionExecutor, MeshService } from '../services';
 import type { SearchResult, MemorySpark } from '../services';
 import { BrowserPane, SearchResultCard, Logo } from '../components';
 import { RefineButton } from '../components/RefineButton';
@@ -45,7 +45,7 @@ export const AskScreen: React.FC<AskScreenProps> = ({
     onToggleOnline,
     identityLoaded,
 }) => {
-    const [mode, setMode] = useState<AskMode>('MirrorMesh');
+    const [mode, setMode] = useState<AskMode>('Claude');
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [streamingText, setStreamingText] = useState('');
@@ -358,6 +358,68 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                 timestamp: new Date(),
             };
             setMessages([...newMessages, responseMessage]);
+        } else if (mode === 'Claude') {
+            // Claude mode — route through mesh relay to Mac voice orchestrator
+            if (!MeshService.isConnected()) {
+                // Try to connect
+                setAgentStatus('Connecting to Mac...');
+                setIsAgentRunning(true);
+                const connected = await MeshService.connect();
+                if (!connected) {
+                    const errorMessage: ChatMessage = {
+                        role: 'assistant',
+                        content: 'Cannot reach Claude on Mac. Check Tailscale/mesh relay.',
+                        timestamp: new Date(),
+                    };
+                    setMessages([...newMessages, errorMessage]);
+                    setIsAgentRunning(false);
+                    setAgentStatus('');
+                    return;
+                }
+            }
+
+            setIsAgentRunning(true);
+            setAgentStatus('Sending to Claude...');
+
+            // Send via mesh relay to claude-mac
+            const sent = MeshService.sendChat('claude-mac', messageText);
+            if (!sent) {
+                const errorMessage: ChatMessage = {
+                    role: 'assistant',
+                    content: 'Failed to send message. Mesh not connected.',
+                    timestamp: new Date(),
+                };
+                setMessages([...newMessages, errorMessage]);
+                setIsAgentRunning(false);
+                setAgentStatus('');
+                return;
+            }
+
+            // Listen for response from mesh relay
+            const responsePromise = new Promise<string>((resolve) => {
+                const timeout = setTimeout(() => {
+                    cleanup();
+                    resolve('Claude is processing. Response will arrive via voice.');
+                }, 15000);
+
+                const cleanup = MeshService.onMessage((msg) => {
+                    if (msg.type === 'chat' && 'from' in msg && msg.from === 'claude-mac') {
+                        clearTimeout(timeout);
+                        cleanup();
+                        resolve((msg as { content: string }).content);
+                    }
+                });
+            });
+
+            const response = await responsePromise;
+            const assistantMessage: ChatMessage = {
+                role: 'assistant',
+                content: response,
+                timestamp: new Date(),
+            };
+            setMessages([...newMessages, assistantMessage]);
+            setIsAgentRunning(false);
+            setAgentStatus('');
         } else if (mode === 'Online') {
             // Web Search Mode
             setIsSearching(true);
@@ -437,13 +499,14 @@ export const AskScreen: React.FC<AskScreenProps> = ({
 
             {/* Mode chips */}
             <View style={styles.modeChips}>
+                <ModeChip label="Claude" active={mode === 'Claude'} onPress={() => handleModeChange('Claude')} indicator={mode === 'Claude' && MeshService.isConnected()} />
                 <ModeChip label="MirrorMesh" active={mode === 'MirrorMesh'} onPress={() => handleModeChange('MirrorMesh')} />
                 <ModeChip label="Vault" active={mode === 'Vault'} onPress={() => handleModeChange('Vault')} />
                 <ModeChip label="Search" active={mode === 'Online'} onPress={() => handleModeChange('Online')} indicator={mode === 'Online'} />
             </View>
 
             {/* Model warning */}
-            {!isModelLoaded && mode === 'MirrorMesh' && (
+            {!isModelLoaded && mode === 'MirrorMesh' && mode !== 'Claude' && (
                 <TouchableOpacity style={styles.modelWarning} onPress={() => setShowModelModal(true)}>
                     <Text style={styles.modelWarningText}>⚠️ No model loaded — tap to download</Text>
                 </TouchableOpacity>
@@ -481,7 +544,8 @@ export const AskScreen: React.FC<AskScreenProps> = ({
                         {!sessionState.showRestorePrompt && (
                             <>
                                 <Text style={styles.emptyPrompt}>
-                                    {mode === 'MirrorMesh' ? "What are you trying to decide, build, or understand?"
+                                    {mode === 'Claude' ? "Talk to Claude on your Mac..."
+                                        : mode === 'MirrorMesh' ? "What are you trying to decide, build, or understand?"
                                         : mode === 'Vault' ? "Search your vault..."
                                             : "Search the web..."}
                                 </Text>
@@ -690,6 +754,7 @@ const MessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
 
 const getPlaceholder = (mode: AskMode): string => {
     switch (mode) {
+        case 'Claude': return 'Ask Claude...';
         case 'MirrorMesh': return 'Ask MirrorMesh...';
         case 'Vault': return 'Search vault...';
         case 'Online': return 'Search the web...';

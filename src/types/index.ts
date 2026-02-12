@@ -22,7 +22,7 @@ export interface Signal {
 }
 
 // ASK Panel types from spec Part IV
-export type AskMode = 'MirrorMesh' | 'Vault' | 'Online';
+export type AskMode = 'MirrorMesh' | 'Vault' | 'Online' | 'Claude';
 
 export interface MirrorMeshSession {
     id: string;
